@@ -1,0 +1,319 @@
+:root {
+    --blur: 12px;
+    --radius: 16px;
+    --padding: 12px 16px;
+    --gap: 10px;
+    --font-color: #222;
+    --bg-color: #f4f8fb;
+    --glass-bg: rgba(255, 255, 255, .55);
+    --glass-border: rgba(255, 255, 255, .75);
+    --shadow: 0 8px 32px rgba(0, 0, 0, .1);
+}
+.theme-dark {
+    --font-color: #eaeaea;
+    --bg-color: #121212;
+    --glass-bg: rgba(34, 34, 34, .55);
+    --glass-border: rgba(255, 255, 255, .08);
+    --shadow: 0 8px 32px rgba(0, 0, 0, .35);
+}
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+body {
+    background: var(--bg-color);
+    color: var(--font-color);
+    transition: background .3s, color .3s;
+}
+
+/* 设置按钮：圆形玻璃 + 黑白图标 */
+#settings-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: 50%;
+    color: var(--font-color);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+#settings-btn:hover {
+    transform: scale(1.1);
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+.modal-content {
+    background: var(--glass-bg);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    width: 80%;
+    max-width: 400px;
+}
+.close-btn {
+    color: var(--font-color);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.settings-item {
+    margin-bottom: 10px;
+}
+.settings-item label {
+    display: block;
+    margin-bottom: 5px;
+}
+.settings-item button {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    background: linear-gradient(45deg, #0078ff, #00c6ff);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.settings-item button:hover {
+    transform: scale(1.02);
+}
+
+/* 右上角按钮组 */
+.top-btns {
+    position: fixed;
+    top: 12px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 10;
+}
+.glass-switch {
+    width: 52px;
+    height: 28px;
+    padding: 3px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+.glass-switch input { display: none; }
+.slider {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--font-color);
+    transition: transform 0.3s;
+}
+html.theme-dark .glass-switch .slider {
+    transform: translateX(calc(52px - 22px - 2 * 3px - 2px));
+}
+
+/* 好友页 */
+.friend-header {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0 10px;
+}
+.blue-text {
+    font-size: 2.5rem;
+    background: linear-gradient(45deg, #0078ff, #00c6ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 1px;
+}
+.friend-only {
+    display: flex;
+    justify-content: center;
+    padding: 0 20px;
+}
+.friend-cards {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.friend-card {
+    width: 100%;
+    padding: 16px 20px;
+    border-radius: 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    text-align: center;
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+}
+.friend-card:hover {
+    transform: scale(1.02);
+    background: rgba(255, 255, 255, .65);
+}
+.theme-dark .friend-card:hover {
+    background: rgba(255, 255, 255, .1);
+}
+
+/* 登录页 */
+.login-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+.login-card {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+    padding: var(--padding);
+}
+.login-card h2 {
+    text-align: center;
+    margin-bottom: 8px;
+}
+input.glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: var(--radius);
+    padding: var(--padding);
+    color: var(--font-color);
+}
+input.glass::placeholder {
+    color: var(--font-color);
+    opacity: .6;
+}
+#feedback {
+    display: none;
+    margin-top: 6px;
+    min-height: 24px;
+    border-radius: 12px;
+    padding: 6px 10px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    color: var(--font-color);
+}
+#feedback.success {
+    background: rgba(82, 196, 26, .25);
+    border-color: rgba(82, 196, 26, .4);
+}
+#feedback.error {
+    background: rgba(255, 77, 79, .25);
+    border-color: rgba(255, 77, 79, .4);
+}
+
+/* 聊天页 */
+.chat-header {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0 10px;
+}
+.back-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    text-decoration: none;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+.chat-only {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 140px);
+    padding: 0 20px;
+}
+#chat-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+}
+#input-area {
+    display: flex;
+    gap: 8px;
+}
+
+/* 登录按钮：蓝色玻璃 + 大字体 + 圆角 */
+.login-btn {
+    width: 100%;
+    height: 48px; /* 增加按钮高度 */
+    font-size: 18px; /* 增加字体大小 */
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(45deg, #0078ff, #00c6ff); /* 蓝色渐变背景 */
+    border: none;
+    box-shadow: 0 6px 20px rgba(0, 120, 255, 0.25); /* 添加阴影 */
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: var(--radius); /* 圆角 */
+    color: #fff; /* 白色文字 */
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.login-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 120, 255, 0.35); /* 鼠标悬停时增加阴影 */
+}
+
