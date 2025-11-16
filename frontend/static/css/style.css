@@ -317,3 +317,95 @@ input.glass::placeholder {
     box-shadow: 0 8px 24px rgba(0, 120, 255, 0.35); /* 鼠标悬停时增加阴影 */
 }
 
+/* 模态框头部 */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.modal-header h2 {
+    margin: 0;
+}
+
+/* 设置区域 */
+.settings-section {
+    margin-bottom: 20px;
+}
+
+/* 输入组 */
+.input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.input-group input {
+    flex: 1;
+}
+
+.btn-small {
+    padding: 8px 12px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+/* 设置底部 */
+.settings-footer {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.btn-block {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+}
+
+/* 响应式优化 */
+@media (max-width: 480px) {
+    .input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .btn-small {
+        align-self: flex-end;
+    }
+}
+
+/* 退出登录按钮 - 淡红色玻璃效果 */
+#logout-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: var(--radius);
+    color: #ff6b6b; /* 淡红色文字 */
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+#logout-btn:hover {
+    background: rgba(255, 107, 107, 0.15); /* 淡红色背景悬停效果 */
+    transform: scale(1.02);
+}
+
+/* 深色主题下的退出按钮 */
+.theme-dark #logout-btn {
+    color: #ff8e8e; /* 深色主题下的较亮淡红色 */
+}
+
+.theme-dark #logout-btn:hover {
+    background: rgba(255, 142, 142, 0.2); /* 深色主题下的悬停效果 */
+}
+
+

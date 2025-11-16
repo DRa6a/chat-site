@@ -31,24 +31,36 @@
 
     <div id="settings-modal" class="modal">
         <div class="modal-content glass">
-            <span class="close-btn" id="close-settings">&times;</span>
-            <h2>设置</h2>
-            <div class="settings-item">
-                <label for="username-input">用户名</label>
-                <input type="text" id="username-input" class="glass" value="">
+            <div class="modal-header">
+                <h2>设置</h2>
+                <span class="close-btn" id="close-settings">&times;</span>
             </div>
-            <div class="settings-item">
-                <label for="password-input">密码</label>
-                <input type="text" id="password-input" class="glass" value="">
+
+            <div class="settings-section">
+                <div class="settings-item">
+                    <label for="username-input">用户名</label>
+                    <div class="input-group">
+                        <input type="text" id="username-input" class="glass" value="">
+                        <button id="save-username-btn" class="glass btn-small">保存</button>
+                    </div>
+                </div>
+
+                <div class="settings-item">
+                    <label for="password-input">密码</label>
+                    <div class="input-group">
+                        <input type="text" id="password-input" class="glass" value="">
+                        <button id="save-password-btn" class="glass btn-small">保存</button>
+                    </div>
+                </div>
             </div>
-            <div class="settings-item">
-                <button id="save-changes-btn" class="glass">保存更改</button>
-            </div>
-            <div class="settings-item">
-                <button id="logout-btn" class="glass">退出登录</button>
+
+            <div class="settings-footer">
+                <button id="logout-btn" class="glass btn-block">退出登录</button>
             </div>
         </div>
     </div>
+
+
 
     <script src="/static/js/chat.js"></script>
 </body>
