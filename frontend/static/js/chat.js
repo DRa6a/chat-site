@@ -12,7 +12,7 @@ document.getElementById('close-settings').addEventListener('click', () => {
     document.getElementById('settings-modal').style.display = 'none';
 });
 
-// 退出登录按钮点击事件
+// 退出登录按钮点击事件（模态框按钮）
 document.getElementById('logout-btn').addEventListener('click', () => {
     if (confirm('确定要退出登录吗？')) {
         localStorage.removeItem('chat-user');

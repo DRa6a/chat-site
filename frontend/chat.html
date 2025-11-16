@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
-    <title>Chat - {{ friend }} | Chat Site</title>
+    <title>与 {{ friend }} 聊天 | 聊天网站</title>
     <link rel="stylesheet" href="/static/css/style.css" />
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         const me = localStorage.getItem('chat-user');
         const peer = "{{ friend }}";
@@ -11,24 +12,29 @@
     </script>
 </head>
 <body>
-    <div class="top-btns">
-        <a href="/" class="glass back-btn" title="返回好友列表">←</a>
-        <h1 class="blue-text">Chat with <span id="peername">{{ friend }}</span></h1>
-        <button id="logout-btn" class="glass" title="退出登录">⎗</button>
-        <label class="glass-switch" title="切换主题">
-            <input type="checkbox" id="theme-cb">
-            <span class="slider"></span>
-        </label>
+    <div class="top-bar">
+        <a href="/" class="glass back-btn" title="返回好友列表">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="chat-header">
+            <h1 class="blue-text">与 <span id="peername">{{ friend }}</span> 聊天</h1>
+        </div>
+        <div class="top-btns">
+            <label class="glass-switch" title="切换主题">
+                <input type="checkbox" id="theme-cb">
+                <span class="slider"></span>
+            </label>
+        </div>
     </div>
 
-    <main class="chat-only">
-        <div id="chat-box" class="glass"></div>
-        <div id="input-area">
-            <input type="text" id="message-input" placeholder="Type a message..." class="glass" />
-            <button onclick="sendMessage()" class="glass">Send</button>
+    <main class="chat-container">
+        <div id="chat-messages" class="messages-container glass"></div>
+        <div class="input-container glass">
+            <input type="text" id="message-input" placeholder="输入消息..." class="glass" />
+            <button id="send-btn" class="glass send-btn">发送</button>
         </div>
     </main>
 
-    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/friends.js"></script>
 </body>
 </html>

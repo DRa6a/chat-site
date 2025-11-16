@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
-    <title>Friends - Chat Site</title>
+    <title>好友 - 聊天网站</title>
     <link rel="stylesheet" href="/static/css/style.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script>
@@ -11,18 +11,20 @@
     </script>
 </head>
 <body>
-    <div class="top-btns">
-        <button id="settings-btn" class="glass" title="设置">
-            <i class="fas fa-cog"></i>
-        </button>
-        <label class="glass-switch" title="切换主题">
-            <input type="checkbox" id="theme-cb">
-            <span class="slider"></span>
-        </label>
+    <div class="top-bar">
+        <div class="top-btns">
+            <button id="settings-btn" class="glass" title="设置">
+                <i class="fas fa-cog"></i>
+            </button>
+            <label class="glass-switch" title="切换主题">
+                <input type="checkbox" id="theme-cb">
+                <span class="slider"></span>
+            </label>
+        </div>
     </div>
 
     <header class="friend-header">
-        <h1 class="blue-text">Welcome <span id="uname"></span>!</h1>
+        <h1 class="blue-text">欢迎 <span id="uname"></span>!</h1>
     </header>
 
     <!-- 添加好友区域 -->
