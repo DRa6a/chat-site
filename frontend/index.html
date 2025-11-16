@@ -25,6 +25,20 @@
         <h1 class="blue-text">Welcome <span id="uname"></span>!</h1>
     </header>
 
+    <!-- 添加好友区域 -->
+    <div class="add-friend-section">
+        <div class="add-friend-container glass">
+            <h3>添加好友</h3>
+            <div class="input-group">
+                <input type="text" id="friend-input" class="glass" placeholder="输入好友用户名">
+                <button id="add-friend-btn" class="glass">添加</button>
+            </div>
+            <!-- 页面内提示区域 -->
+            <div id="add-friend-feedback" class="feedback-message" style="display: none;"></div>
+        </div>
+    </div>
+
+
     <main class="friend-only">
         <div class="friend-cards glass" id="fcards"></div>
     </main>
@@ -59,8 +73,6 @@
             </div>
         </div>
     </div>
-
-
 
     <script src="/static/js/chat.js"></script>
 </body>

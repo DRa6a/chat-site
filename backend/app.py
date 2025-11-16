@@ -70,5 +70,41 @@ def api_change_password():
         return jsonify({'ok': True})
     return jsonify({'ok': False}), 401
 
+@app.route('/api/add-friend', methods=['POST'])
+def api_add_friend():
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    friend_name = request.json.get('friendName', '').strip()
+
+    # 验证当前用户是否存在
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+
+    # 验证好友是否存在
+    if friend_name not in users:
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+
+    # 不能添加自己为好友
+    if friend_name == current_user:
+        return jsonify({'ok': False, 'msg': '不能添加自己为好友'}), 400
+
+    # 读取当前用户的好友列表
+    friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
+    if friend_file.exists():
+        friends_list = json.loads(friend_file.read_text())
+    else:
+        friends_list = [current_user]
+
+    # 检查是否已经是好友
+    if friend_name in friends_list:
+        return jsonify({'ok': False, 'msg': '该用户已是好友'}), 400
+
+    # 添加好友
+    friends_list.append(friend_name)
+    friend_file.write_text(json.dumps(friends_list, ensure_ascii=False, indent=4))
+
+    return jsonify({'ok': True, 'msg': '好友添加成功'})
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)

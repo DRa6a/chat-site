@@ -139,3 +139,59 @@ document.getElementById('uname').textContent = localStorage.getItem('chat-user')
 
 // 初始化加载好友列表
 loadFriends();
+
+// 添加好友按钮点击事件
+document.getElementById('add-friend-btn').addEventListener('click', async () => {
+    const friendName = document.getElementById('friend-input').value.trim();
+    const currentUser = localStorage.getItem('chat-user');
+    const feedbackElement = document.getElementById('add-friend-feedback');
+
+    // 检查输入
+    if (!friendName) {
+        showAddFriendFeedback('请输入好友用户名！', 'error');
+        return;
+    }
+
+    if (friendName === currentUser) {
+        showAddFriendFeedback('不能添加自己为好友！', 'error');
+        return;
+    }
+
+    // 发送请求添加好友
+    const res = await fetch('/api/add-friend', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-User': currentUser
+        },
+        body: JSON.stringify({friendName: friendName})
+    });
+    const data = await res.json();
+    if (data.ok) {
+        showAddFriendFeedback(data.msg, 'success');
+        document.getElementById('friend-input').value = ''; // 清空输入框
+        // 重新加载好友列表
+        loadFriends();
+        // 3秒后隐藏成功提示
+        setTimeout(() => {
+            feedbackElement.style.display = 'none';
+        }, 3000);
+    } else {
+        showAddFriendFeedback(data.msg || '添加好友失败！', 'error');
+    }
+});
+
+// 显示添加好友反馈信息
+function showAddFriendFeedback(message, type) {
+    const feedbackElement = document.getElementById('add-friend-feedback');
+    feedbackElement.textContent = message;
+    feedbackElement.className = 'feedback-message ' + type;
+    feedbackElement.style.display = 'block';
+
+    // 3秒后自动隐藏错误提示
+    if (type === 'error') {
+        setTimeout(() => {
+            feedbackElement.style.display = 'none';
+        }, 3000);
+    }
+}

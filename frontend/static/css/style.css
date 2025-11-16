@@ -408,4 +408,134 @@ input.glass::placeholder {
     background: rgba(255, 142, 142, 0.2); /* 深色主题下的悬停效果 */
 }
 
+/* 添加好友区域 */
+.add-friend-section {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.add-friend-container {
+    width: 100%;
+    max-width: 400px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.add-friend-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--font-color);
+}
+
+.add-friend-container .input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.add-friend-container input {
+    flex: 1;
+}
+
+.add-friend-container button {
+    padding: 10px 15px;
+    background: linear-gradient(45deg, #0078ff, #00c6ff);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.add-friend-container button:hover {
+    transform: scale(1.05);
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+    .add-friend-container .input-group {
+        flex-direction: column;
+    }
+
+    .add-friend-container button {
+        align-self: stretch;
+        text-align: center;
+    }
+}
+
+/* 添加好友区域 */
+.add-friend-section {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.add-friend-container {
+    width: 100%;
+    max-width: 400px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.add-friend-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--font-color);
+}
+
+.add-friend-container .input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.add-friend-container input {
+    flex: 1;
+}
+
+.add-friend-container button {
+    padding: 10px 15px;
+    background: linear-gradient(45deg, #0078ff, #00c6ff);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.add-friend-container button:hover {
+    transform: scale(1.05);
+}
+
+/* 页面内提示消息 */
+.feedback-message {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    transition: opacity 0.3s;
+}
+
+.feedback-message.success {
+    background: rgba(82, 196, 26, 0.25);
+    border: 1px solid rgba(82, 196, 26, 0.4);
+    color: #52c41a;
+}
+
+.feedback-message.error {
+    background: rgba(255, 77, 79, 0.25);
+    border: 1px solid rgba(255, 77, 79, 0.4);
+    color: #ff4d4f;
+}
+
 
