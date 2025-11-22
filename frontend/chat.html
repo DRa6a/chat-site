@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <title>与 {{ friend }} 聊天 | 聊天网站</title>
     <link rel="stylesheet" href="/static/css/style.css" />
-    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // 在页面加载前检测并应用主题，避免闪烁
+        (function() {
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('theme-dark');
+            }
+        })();
+    </script>
     <script>
         const me = localStorage.getItem('chat-user');
         const peer = "{{ friend }}";

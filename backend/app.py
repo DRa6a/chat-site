@@ -3,7 +3,7 @@ import sqlite3
 from flask import Flask, request, jsonify, render_template
 import json, pathlib, os
 from datetime import datetime
-from flask_socketio import SocketIO, emit, join_room, leave_room
+# from flask_socketio import SocketIO, emit, join_room, leave_room
 
 app = Flask(__name__,
             template_folder='../frontend',
@@ -11,7 +11,7 @@ app = Flask(__name__,
 app.config['SECRET_KEY'] = 'your-secret-key'
 
 # 初始化SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+# socketio = SocketIO(app, cors_allowed_origins="*")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 USER_FILE = ROOT / 'data' / 'users.json'
@@ -105,19 +105,19 @@ def save_chat_message(user1, user2, sender, content):
         cursor.execute('''
             INSERT INTO messages (sender, recipient, content, timestamp)
             VALUES (?, ?, ?, ?)
-        ''', (sender, user2 if sender == user1 else user1, content, datetime.now().isoformat()))
+        ''', (sender, user2, content, datetime.now().isoformat()))
         
         conn.commit()
         conn.close()
         
         # 通过WebSocket通知相关用户有新消息
-        room = "_".join(sorted([user1, user2]))
-        socketio.emit('new_message', {
-            'sender': sender,
-            'recipient': user2 if sender == user1 else user1,
-            'content': content,
-            'timestamp': datetime.now().isoformat()
-        }, room=room)
+        # room = "_".join(sorted([user1, user2]))
+        # socketio.emit('new_message', {
+        #     'sender': sender,
+        #     'recipient': user2,
+        #     'content': content,
+        #     'timestamp': datetime.now().isoformat()
+        # }, room=room)
     except Exception as e:
         print(f"保存到数据库时出错: {e}")
     
@@ -284,36 +284,37 @@ def api_chat_history():
     return jsonify({'ok': True, 'history': history})
 
 # WebSocket事件处理
-@socketio.on('join')
-def on_join(data):
-    """用户加入房间"""
-    username = data['username']
-    friend = data['friend']
-    room = "_".join(sorted([username, friend]))
-    join_room(room)
-    emit('status', {'msg': f'{username}加入了聊天室'})
+# @socketio.on('join')
+# def on_join(data):
+#     """用户加入房间"""
+#     username = data['username']
+#     friend = data['friend']
+#     room = "_".join(sorted([username, friend]))
+#     join_room(room)
+#     emit('status', {'msg': f'{username}加入了聊天室'})
 
-@socketio.on('leave')
-def on_leave(data):
-    """用户离开房间"""
-    username = data['username']
-    friend = data['friend']
-    room = "_".join(sorted([username, friend]))
-    leave_room(room)
-    emit('status', {'msg': f'{username}离开了聊天室'})
+# @socketio.on('leave')
+# def on_leave(data):
+#     """用户离开房间"""
+#     username = data['username']
+#     friend = data['friend']
+#     room = "_".join(sorted([username, friend]))
+#     leave_room(room)
+#     emit('status', {'msg': f'{username}离开了聊天室'})
 
-@socketio.on('send_message')
-def on_send_message(data):
-    """通过WebSocket发送消息"""
-    sender = data['sender']
-    recipient = data['recipient']
-    content = data['content']
+# @socketio.on('send_message')
+# def on_send_message(data):
+#     """通过WebSocket发送消息"""
+#     sender = data['sender']
+#     recipient = data['recipient']
+#     content = data['content']
     
-    # 保存消息到数据库
-    save_chat_message(sender, recipient, sender, content)
+#     # 保存消息到数据库
+#     save_chat_message(sender, recipient, sender, content)
 
 if __name__ == '__main__':
     # 初始化数据库
     init_db()
     # 启动服务器（包括WebSocket支持）
-    socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
+    # socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
+    app.run(host='0.0.0.0', port=80, debug=True)

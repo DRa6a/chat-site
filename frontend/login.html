@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <title>登录 - Chat Site</title>
     <link rel="stylesheet" href="/static/css/style.css?v=5" />
+    <script>
+        // 在页面加载前检测并应用主题，避免闪烁
+        (function() {
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('theme-dark');
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- 只留主题切换按钮 -->

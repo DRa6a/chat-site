@@ -4,7 +4,8 @@ class ChatApp {
         this.me = localStorage.getItem('chat-user');
         this.peer = document.getElementById('peername').textContent;
         this.messages = [];
-        this.socket = null;
+        this.pollingInterval = null;
+        this.lastMessageCount = 0;
         this.init();
     }
 
@@ -13,7 +14,8 @@ class ChatApp {
         this.loadTheme();
         this.loadChatHistory();
         this.scrollToBottom();
-        this.initWebSocket();
+        // 启动轮询机制，每2秒检查一次新消息
+        this.startPolling();
     }
 
     setupEventListeners() {
@@ -46,98 +48,41 @@ class ChatApp {
         }
     }
 
-    initWebSocket() {
-        // 注意：在实际部署时，需要根据部署环境调整WebSocket服务器地址
-        this.socket = io('' + window.location, {reconnection: true});
-        
-        // 连接成功事件
-        this.socket.on('connect', () => {
-            console.log('WebSocket连接成功');
-            // 加入聊天室
-            this.socket.emit('join', {
-                username: this.me,
-                friend: this.peer
-            });
-        });
-        
-        // 接收新消息事件
-        this.socket.on('new_message', (data) => {
-            console.log('收到新消息:', data);
-            // 只处理与当前聊天相关的新消息
-            if ((data.sender === this.me && data.recipient === this.peer) || 
-                (data.sender === this.peer && data.recipient === this.me)) {
-                const message = {
-                    sender: data.sender,
-                    content: data.content,
-                    timestamp: new Date(data.timestamp)
-                };
-                this.addMessageToUI(message, data.sender === this.me);
-                this.scrollToBottom();
-            }
-        });
-        
-        // 状态消息事件
-        this.socket.on('status', (data) => {
-            console.log('状态消息:', data.msg);
-        });
-        
-        // 连接错误事件
-        this.socket.on('connect_error', (error) => {
-            console.error('WebSocket连接错误:', error);
-        });
-    }
-
     async sendMessage() {
         const input = document.getElementById('message-input');
         const content = input.value.trim();
 
         if (content) {
-            // 通过WebSocket发送消息
-            if (this.socket && this.socket.connected) {
-                this.socket.emit('send_message', {
-                    sender: this.me,
+            // 发送到服务器
+            const response = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': this.me
+                },
+                body: JSON.stringify({
                     recipient: this.peer,
                     content: content
-                });
-                
-                // 在本地立即显示消息
+                })
+            });
+
+            const result = await response.json();
+            if (result.ok) {
+                // 添加到UI
                 const message = {
                     sender: this.me,
                     content: content,
                     timestamp: new Date()
                 };
-                
+
                 this.addMessageToUI(message, true);
                 input.value = '';
                 this.scrollToBottom();
+                
+                // 立即检查新消息以确保显示最新内容
+                setTimeout(() => this.checkForNewMessages(), 100);
             } else {
-                // 如果WebSocket不可用，回退到HTTP请求
-                const response = await fetch('/api/send-message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-User': this.me
-                    },
-                    body: JSON.stringify({
-                        recipient: this.peer,
-                        content: content
-                    })
-                });
-
-                const result = await response.json();
-                if (result.ok) {
-                    const message = {
-                        sender: this.me,
-                        content: content,
-                        timestamp: new Date()
-                    };
-
-                    this.addMessageToUI(message, true);
-                    input.value = '';
-                    this.scrollToBottom();
-                } else {
-                    alert(result.msg || '发送消息失败');
-                }
+                alert(result.msg || '发送消息失败');
             }
         }
     }
@@ -189,6 +134,7 @@ class ChatApp {
                     this.addMessageToUI(message, isOwnMessage);
                 });
 
+                this.lastMessageCount = result.history.length;
                 this.scrollToBottom();
             } else {
                 console.error('加载聊天历史失败:', result.msg);
@@ -198,20 +144,65 @@ class ChatApp {
         }
     }
 
+    // 新增：轮询获取新消息
+    async checkForNewMessages() {
+        try {
+            const response = await fetch(`/api/chat-history?friend=${this.peer}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            const result = await response.json();
+            if (result.ok) {
+                // 检查是否有新消息
+                if (result.history.length > this.lastMessageCount) {
+                    // 有新消息，更新显示
+                    this.lastMessageCount = result.history.length;
+                    const container = document.getElementById('chat-messages');
+                    container.innerHTML = '';
+
+                    result.history.forEach(msg => {
+                        const message = {
+                            sender: msg.sender,
+                            content: msg.content,
+                            timestamp: new Date(msg.timestamp)
+                        };
+                        const isOwnMessage = msg.sender === this.me;
+                        this.addMessageToUI(message, isOwnMessage);
+                    });
+
+                    this.scrollToBottom();
+                }
+            }
+        } catch (error) {
+            console.error('检查新消息出错:', error);
+        }
+    }
+
+    // 新增：启动轮询
+    startPolling() {
+        this.pollingInterval = setInterval(() => {
+            this.checkForNewMessages();
+        }, 2000); // 每2秒检查一次新消息
+    }
+
+    // 新增：停止轮询
+    stopPolling() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+    }
+
     scrollToBottom() {
         const container = document.getElementById('chat-messages');
         container.scrollTop = container.scrollHeight;
     }
 
     destroy() {
-        // 离开聊天室
-        if (this.socket) {
-            this.socket.emit('leave', {
-                username: this.me,
-                friend: this.peer
-            });
-            this.socket.disconnect();
-        }
+        // 停止轮询
+        this.stopPolling();
     }
 }
 
