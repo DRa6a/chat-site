@@ -116,15 +116,59 @@ document.getElementById('save-password-btn').addEventListener('click', async () 
     }
 });
 
+// 检查未读消息
+async function checkUnreadMessages() {
+    try {
+        const res = await fetch('/api/unread-messages', {
+            headers: {
+                'X-User': localStorage.getItem('chat-user')
+            }
+        });
+        const data = await res.json();
+        if (data.ok) {
+            // 更新好友列表中的未读消息提示
+            updateUnreadIndicators(data.unread_counts);
+        }
+    } catch (error) {
+        console.error('检查未读消息出错:', error);
+    }
+}
+
+// 更新好友列表中的未读消息提示
+function updateUnreadIndicators(unreadCounts) {
+    // 清除所有现有的未读消息提示
+    document.querySelectorAll('.unread-badge').forEach(el => el.remove());
+    
+    // 为每个有未读消息的好友添加提示
+    for (const [friend, count] of Object.entries(unreadCounts)) {
+        if (count > 0) {
+            // 查找对应的好友卡片
+            const friendCard = document.querySelector(`.friend-card[data-friend="${friend}"]`);
+            if (friendCard) {
+                // 创建未读消息提示元素
+                const badge = document.createElement('span');
+                badge.className = 'unread-badge';
+                badge.textContent = count > 99 ? '99+' : count;
+                
+                // 添加到好友卡片中
+                friendCard.style.position = 'relative';
+                friendCard.appendChild(badge);
+            }
+        }
+    }
+}
 
 // 加载好友列表
 async function loadFriends() {
     const res = await fetch('/api/friends?u=' + localStorage.getItem('chat-user'));
     const list = await res.json();
-    const html = list.map(name => `
+    const html = list.map(name => {
+        // 为每个好友卡片添加data-friend属性，方便后续扩展
+        return `
         <div class="friend-card glass" data-friend="${name}">
             <span class="fname">${name}</span>
-        </div>`).join('');
+        </div>`;
+    }).join('');
     document.getElementById('fcards').innerHTML = html;
 
     document.querySelectorAll('.friend-card').forEach(card => {
@@ -132,6 +176,9 @@ async function loadFriends() {
             location.href = '/chat/' + card.dataset.friend;
         });
     });
+    
+    // 加载完成后检查未读消息
+    checkUnreadMessages();
 }
 
 // 显示用户名
@@ -195,3 +242,25 @@ function showAddFriendFeedback(message, type) {
         }, 3000);
     }
 }
+
+// 初始化WebSocket连接
+const socket = io();
+
+// 监听未读消息更新事件
+socket.on('unread_update', function(data) {
+    // 当收到未读消息更新通知时，重新检查未读消息
+    checkUnreadMessages();
+});
+
+// 页面加载完成后开始定期检查未读消息
+document.addEventListener('DOMContentLoaded', () => {
+    // 每30秒重新加载好友列表（确保好友列表是最新的）
+    setInterval(loadFriends, 30000);
+    
+    // 连接到自己的房间以接收未读消息更新
+    const currentUser = localStorage.getItem('chat-user');
+    socket.emit('join', {
+        username: currentUser,
+        friend: currentUser // 加入自己的房间
+    });
+});

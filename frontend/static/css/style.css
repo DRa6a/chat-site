@@ -560,6 +560,24 @@ input.glass::placeholder {
     color: #ff4d4f;
 }
 
+/* 未读消息提示 */
+.unread-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ff4d4f;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 /* 聊天容器 */
 .chat-container {
     display: flex;
@@ -693,6 +711,15 @@ input.glass::placeholder {
     .message-bubble {
         max-width: 85%;
     }
+    
+    /* 未读消息提示在小屏幕上适当调整 */
+    .unread-badge {
+        top: -6px;
+        right: -6px;
+        width: 18px;
+        height: 18px;
+        font-size: 11px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -719,5 +746,14 @@ input.glass::placeholder {
     
     .send-btn {
         padding: 10px 20px;
+    }
+    
+    /* 未读消息提示在小屏幕上适当调整 */
+    .unread-badge {
+        top: -5px;
+        right: -5px;
+        width: 16px;
+        height: 16px;
+        font-size: 10px;
     }
 }

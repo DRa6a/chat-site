@@ -3,7 +3,7 @@ import sqlite3
 from flask import Flask, request, jsonify, render_template
 import json, pathlib, os
 from datetime import datetime
-# from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 app = Flask(__name__,
             template_folder='../frontend',
@@ -11,7 +11,7 @@ app = Flask(__name__,
 app.config['SECRET_KEY'] = 'your-secret-key'
 
 # 初始化SocketIO
-# socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 USER_FILE = ROOT / 'data' / 'users.json'
@@ -47,6 +47,16 @@ def init_db():
         )
     ''')
     
+    # 创建已读消息标记表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS read_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT NOT NULL,
+            message_id INTEGER NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -71,7 +81,7 @@ def load_chat_history(user1, user2):
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT sender, content, timestamp 
+            SELECT id, sender, content, timestamp 
             FROM messages 
             WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
             ORDER BY timestamp ASC
@@ -80,9 +90,10 @@ def load_chat_history(user1, user2):
         messages = []
         for row in cursor.fetchall():
             messages.append({
-                "sender": row[0],
-                "content": row[1],
-                "timestamp": row[2]
+                "id": row[0],
+                "sender": row[1],
+                "content": row[2],
+                "timestamp": row[3]
             })
         
         conn.close()
@@ -107,19 +118,26 @@ def save_chat_message(user1, user2, sender, content):
             VALUES (?, ?, ?, ?)
         ''', (sender, user2, content, datetime.now().isoformat()))
         
+        message_id = cursor.lastrowid
         conn.commit()
         conn.close()
         
         # 通过WebSocket通知相关用户有新消息
-        # room = "_".join(sorted([user1, user2]))
-        # socketio.emit('new_message', {
-        #     'sender': sender,
-        #     'recipient': user2,
-        #     'content': content,
-        #     'timestamp': datetime.now().isoformat()
-        # }, room=room)
+        room = "_".join(sorted([user1, user2]))
+        socketio.emit('new_message', {
+            'sender': sender,
+            'recipient': user2,
+            'content': content,
+            'timestamp': datetime.now().isoformat()
+        }, room=room)
+        
+        # 同时通知接收方首页更新未读消息数
+        socketio.emit('unread_update', {'recipient': user2}, room=user2)
+        
+        return message_id
     except Exception as e:
         print(f"保存到数据库时出错: {e}")
+        return None
     
     # 同时保存到文件系统（为了向后兼容）
     chat_file = get_chat_file(user1, user2)
@@ -261,9 +279,12 @@ def api_send_message():
         return jsonify({'ok': False, 'msg': '消息内容不能为空'}), 400
     
     # 保存消息到数据库
-    save_chat_message(current_user, recipient, current_user, content)
+    message_id = save_chat_message(current_user, recipient, current_user, content)
     
-    return jsonify({'ok': True, 'msg': '消息发送成功'})
+    if message_id:
+        return jsonify({'ok': True, 'msg': '消息发送成功', 'message_id': message_id})
+    else:
+        return jsonify({'ok': False, 'msg': '消息发送失败'}), 500
 
 @app.route('/api/chat-history')
 def api_chat_history():
@@ -283,38 +304,148 @@ def api_chat_history():
     history = load_chat_history(current_user, friend)
     return jsonify({'ok': True, 'history': history})
 
-# WebSocket事件处理
-# @socketio.on('join')
-# def on_join(data):
-#     """用户加入房间"""
-#     username = data['username']
-#     friend = data['friend']
-#     room = "_".join(sorted([username, friend]))
-#     join_room(room)
-#     emit('status', {'msg': f'{username}加入了聊天室'})
-
-# @socketio.on('leave')
-# def on_leave(data):
-#     """用户离开房间"""
-#     username = data['username']
-#     friend = data['friend']
-#     room = "_".join(sorted([username, friend]))
-#     leave_room(room)
-#     emit('status', {'msg': f'{username}离开了聊天室'})
-
-# @socketio.on('send_message')
-# def on_send_message(data):
-#     """通过WebSocket发送消息"""
-#     sender = data['sender']
-#     recipient = data['recipient']
-#     content = data['content']
+@app.route('/api/unread-messages')
+def api_unread_messages():
+    """获取未读消息数量"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
     
-#     # 保存消息到数据库
-#     save_chat_message(sender, recipient, sender, content)
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    unread_counts = {}
+    
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 获取用户好友列表
+        friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
+        if friend_file.exists():
+            friends_list = json.loads(friend_file.read_text())
+        else:
+            friends_list = [current_user]
+        
+        # 检查每个好友的聊天记录，统计未读消息
+        for friend in friends_list:
+            if friend != current_user:  # 不统计自己
+                # 查询来自好友且用户未读的消息数量
+                cursor.execute('''
+                    SELECT COUNT(*) 
+                    FROM messages m
+                    LEFT JOIN read_messages r ON m.id = r.message_id AND r.user = ?
+                    WHERE m.sender = ? AND m.recipient = ? AND r.message_id IS NULL
+                ''', (current_user, friend, current_user))
+                
+                count = cursor.fetchone()[0]
+                unread_counts[friend] = count
+        
+        conn.close()
+    except Exception as e:
+        print(f"检查未读消息时出错: {e}")
+        # 出错时回退到旧的简单实现
+        friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
+        if friend_file.exists():
+            friends_list = json.loads(friend_file.read_text())
+        else:
+            friends_list = [current_user]
+        
+        # 检查每个好友的聊天记录，统计未读消息
+        for friend in friends_list:
+            if friend != current_user:  # 不统计自己
+                history = load_chat_history(current_user, friend)
+                # 统计对方发送的消息数量（简单实现，实际项目中应该有更精确的已读未读标记）
+                count = 0
+                for msg in history:
+                    if msg['sender'] != current_user:
+                        count += 1
+                unread_counts[friend] = count
+    
+    return jsonify({'ok': True, 'unread_counts': unread_counts})
+
+@app.route('/api/mark-messages-as-read', methods=['POST'])
+def api_mark_messages_as_read():
+    """标记消息为已读"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    friend = request.json.get('friend', '').strip()
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    if friend not in users:
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 获取与好友之间的未读消息
+        cursor.execute('''
+            SELECT m.id
+            FROM messages m
+            LEFT JOIN read_messages r ON m.id = r.message_id AND r.user = ?
+            WHERE m.sender = ? AND m.recipient = ? AND r.message_id IS NULL
+        ''', (current_user, friend, current_user))
+        
+        unread_message_ids = cursor.fetchall()
+        
+        # 将未读消息标记为已读
+        timestamp = datetime.now().isoformat()
+        for (message_id,) in unread_message_ids:
+            cursor.execute('''
+                INSERT INTO read_messages (user, message_id, timestamp)
+                VALUES (?, ?, ?)
+            ''', (current_user, message_id, timestamp))
+        
+        conn.commit()
+        conn.close()
+        
+        # 通知发送方更新未读消息数
+        socketio.emit('unread_update', {'recipient': current_user}, room=friend)
+        
+        return jsonify({'ok': True, 'marked_count': len(unread_message_ids)})
+    except Exception as e:
+        print(f"标记消息为已读时出错: {e}")
+        return jsonify({'ok': False, 'msg': '标记消息为已读失败'}), 500
+
+# WebSocket事件处理
+@socketio.on('join')
+def on_join(data):
+    """用户加入房间"""
+    username = data['username']
+    friend = data['friend']
+    room = "_".join(sorted([username, friend]))
+    join_room(room)
+    # 同时加入自己的房间，用于接收未读消息更新
+    join_room(username)
+    emit('status', {'msg': f'{username}加入了聊天室'})
+
+@socketio.on('leave')
+def on_leave(data):
+    """用户离开房间"""
+    username = data['username']
+    friend = data['friend']
+    room = "_".join(sorted([username, friend]))
+    leave_room(room)
+    leave_room(username)
+    emit('status', {'msg': f'{username}离开了聊天室'})
+
+@socketio.on('send_message')
+def on_send_message(data):
+    """通过WebSocket发送消息"""
+    sender = data['sender']
+    recipient = data['recipient']
+    content = data['content']
+    
+    # 保存消息到数据库
+    save_chat_message(sender, recipient, sender, content)
 
 if __name__ == '__main__':
     # 初始化数据库
     init_db()
     # 启动服务器（包括WebSocket支持）
-    # socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
-    app.run(host='0.0.0.0', port=80, debug=True)
+    socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
+    # app.run(host='0.0.0.0', port=80, debug=True)

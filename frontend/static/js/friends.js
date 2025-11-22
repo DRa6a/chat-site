@@ -6,6 +6,8 @@ class ChatApp {
         this.messages = [];
         this.pollingInterval = null;
         this.lastMessageCount = 0;
+        this.hasNewMessage = false;
+        this.originalTitle = document.title;
         this.init();
     }
 
@@ -13,6 +15,7 @@ class ChatApp {
         this.setupEventListeners();
         this.loadTheme();
         this.loadChatHistory();
+        this.markMessagesAsRead(); // 标记当前聊天为已读
         this.scrollToBottom();
         // 启动轮询机制，每2秒检查一次新消息
         this.startPolling();
@@ -36,6 +39,11 @@ class ChatApp {
             const html = document.documentElement;
             html.classList.toggle('theme-dark', e.target.checked);
             localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+        });
+
+        // 页面获得焦点时清除新消息提示
+        window.addEventListener('focus', () => {
+            this.clearNewMessageIndicator();
         });
     }
 
@@ -144,6 +152,24 @@ class ChatApp {
         }
     }
 
+    // 标记当前聊天消息为已读
+    async markMessagesAsRead() {
+        try {
+            await fetch('/api/mark-messages-as-read', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': this.me
+                },
+                body: JSON.stringify({
+                    friend: this.peer
+                })
+            });
+        } catch (error) {
+            console.error('标记消息为已读出错:', error);
+        }
+    }
+
     // 新增：轮询获取新消息
     async checkForNewMessages() {
         try {
@@ -158,6 +184,7 @@ class ChatApp {
                 // 检查是否有新消息
                 if (result.history.length > this.lastMessageCount) {
                     // 有新消息，更新显示
+                    const newMessageCount = result.history.length - this.lastMessageCount;
                     this.lastMessageCount = result.history.length;
                     const container = document.getElementById('chat-messages');
                     container.innerHTML = '';
@@ -173,10 +200,61 @@ class ChatApp {
                     });
 
                     this.scrollToBottom();
+                    
+                    // 如果不是自己发送的消息，则显示新消息提示
+                    const lastMessage = result.history[result.history.length - 1];
+                    if (lastMessage.sender !== this.me) {
+                        this.showNewMessageIndicator(newMessageCount);
+                    }
                 }
             }
         } catch (error) {
             console.error('检查新消息出错:', error);
+        }
+    }
+
+    // 显示新消息提示
+    showNewMessageIndicator(newMessageCount) {
+        // 只有在页面不处于焦点状态时才显示提示
+        if (!document.hasFocus()) {
+            this.hasNewMessage = true;
+            // 更新页面标题显示新消息提示
+            document.title = `(${newMessageCount}) ${this.originalTitle}`;
+            
+            // 尝试使用浏览器通知（如果支持且已授权）
+            this.showNotification(newMessageCount);
+        }
+    }
+
+    // 清除新消息提示
+    clearNewMessageIndicator() {
+        if (this.hasNewMessage) {
+            this.hasNewMessage = false;
+            document.title = this.originalTitle;
+        }
+    }
+
+    // 显示浏览器通知
+    showNotification(newMessageCount) {
+        // 检查浏览器是否支持通知
+        if ('Notification' in window) {
+            // 检查用户是否已授权显示通知
+            if (Notification.permission === 'granted') {
+                new Notification('新消息', {
+                    body: `您有${newMessageCount}条来自${this.peer}的新消息`,
+                    icon: '/favicon.ico'
+                });
+            } else if (Notification.permission !== 'denied') {
+                // 请求用户授权
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('新消息', {
+                            body: `您有${newMessageCount}条来自${this.peer}的新消息`,
+                            icon: '/favicon.ico'
+                        });
+                    }
+                });
+            }
         }
     }
 
