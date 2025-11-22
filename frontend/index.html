@@ -16,8 +16,47 @@
         })();
     </script>
     <script>
-        const user = JSON.parse(localStorage.getItem('user-info') || '{}');
-        if (!user.username) location.href = '/login';
+        // 检查会话状态
+        (function() {
+            // 从sessionStorage获取当前会话ID
+            const sessionId = sessionStorage.getItem('chat-session-id');
+            if (sessionId) {
+                // 从localStorage获取会话信息
+                const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
+                const session = sessions[sessionId];
+                if (session) {
+                    // 检查会话是否过期（例如超过24小时）
+                    const now = Date.now();
+                    if (now - session.timestamp < 24 * 60 * 60 * 1000) {
+                        // 会话有效，更新时间戳
+                        session.timestamp = now;
+                        sessions[sessionId] = session;
+                        localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+                    } else {
+                        // 会话过期，清理
+                        delete sessions[sessionId];
+                        localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+                        sessionStorage.removeItem('chat-session-id');
+                        sessionStorage.removeItem('chat-user');
+                        sessionStorage.removeItem('user-info');
+                        location.href = '/login';
+                        return;
+                    }
+                } else {
+                    // 会话不存在，跳转到登录页
+                    location.href = '/login';
+                    return;
+                }
+            } else {
+                // 没有会话ID，跳转到登录页
+                location.href = '/login';
+                return;
+            }
+            
+            // 设置用户信息
+            const user = JSON.parse(sessionStorage.getItem('user-info') || '{}');
+            if (!user.username) location.href = '/login';
+        })();
     </script>
 </head>
 <body>
@@ -76,6 +115,28 @@
                     <div class="input-group">
                         <input type="text" id="password-input" class="glass" value="">
                         <button id="save-password-btn" class="glass btn-small">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3>关于</h3>
+                <div class="about-section">
+                    <p><strong>版本:</strong> v1.1.0</p>
+                    <div class="changelog">
+                        <h4>更新日志:</h4>
+                        <ul>
+                            <li>实现基本的聊天功能</li>
+                            <li>添加好友管理功能</li>
+                            <li>实现深色/浅色主题切换</li>
+                            <li>解决主题切换时的页面闪烁问题</li>
+                            <li>优化UI界面和交互体验</li>
+                            <li>实现未读消息提示功能</li>
+                            <li>集成WebSocket实现实时通信</li>
+                            <li>移除过时的JSON文件存储机制</li>
+                            <li>支持多标签页独立登录</li>
+                            <li>优化日志输出，合并统计信息显示，保持高频轮询确保消息实时性</li>
+                        </ul>
                     </div>
                 </div>
             </div>

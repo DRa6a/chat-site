@@ -2,7 +2,7 @@
 document.getElementById('settings-btn').addEventListener('click', () => {
     document.getElementById('settings-modal').style.display = 'block';
     // 填充当前用户名和密码
-    const user = JSON.parse(localStorage.getItem('user-info') || '{}');
+    const user = JSON.parse(sessionStorage.getItem('user-info') || '{}');
     document.getElementById('username-input').value = user.username || '';
     document.getElementById('password-input').value = user.password || ''; // 显示当前密码
 });
@@ -15,8 +15,18 @@ document.getElementById('close-settings').addEventListener('click', () => {
 // 退出登录按钮点击事件（模态框按钮）
 document.getElementById('logout-btn').addEventListener('click', () => {
     if (confirm('确定要退出登录吗？')) {
-        localStorage.removeItem('chat-user');
-        localStorage.removeItem('user-info');
+        // 获取当前会话ID
+        const sessionId = sessionStorage.getItem('chat-session-id');
+        if (sessionId) {
+            // 从localStorage中移除当前会话
+            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
+            delete sessions[sessionId];
+            localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+        }
+        // 清除sessionStorage中的用户信息
+        sessionStorage.removeItem('chat-session-id');
+        sessionStorage.removeItem('chat-user');
+        sessionStorage.removeItem('user-info');
         location.href = '/login';
     }
 });
@@ -36,7 +46,7 @@ themeCb.addEventListener('change', e => {
 // 保存用户名按钮点击事件
 document.getElementById('save-username-btn').addEventListener('click', async () => {
     const newUsername = document.getElementById('username-input').value.trim();
-    const currentUser = localStorage.getItem('chat-user');
+    const currentUser = sessionStorage.getItem('chat-user');
 
     // 检查输入
     if (!newUsername) {
@@ -60,12 +70,24 @@ document.getElementById('save-username-btn').addEventListener('click', async () 
     });
     const data = await res.json();
     if (data.ok) {
-        localStorage.setItem('chat-user', newUsername);
+        sessionStorage.setItem('chat-user', newUsername);
         document.getElementById('uname').textContent = newUsername;
-        // 更新本地存储的用户信息
-        const userInfo = JSON.parse(localStorage.getItem('user-info') || '{}');
+        // 更新sessionStorage中的用户信息
+        const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
         userInfo.username = newUsername;
-        localStorage.setItem('user-info', JSON.stringify(userInfo));
+        sessionStorage.setItem('user-info', JSON.stringify(userInfo));
+        
+        // 更新localStorage中的会话信息
+        const sessionId = sessionStorage.getItem('chat-session-id');
+        if (sessionId) {
+            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
+            if (sessions[sessionId]) {
+                sessions[sessionId].user = newUsername;
+                sessions[sessionId].userInfo = userInfo;
+                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+            }
+        }
+        
         alert('用户名修改成功！');
     } else {
         // 根据后端返回的错误信息给出具体提示
@@ -80,7 +102,7 @@ document.getElementById('save-username-btn').addEventListener('click', async () 
 // 保存密码按钮点击事件
 document.getElementById('save-password-btn').addEventListener('click', async () => {
     const newPassword = document.getElementById('password-input').value.trim();
-    const currentUser = localStorage.getItem('chat-user');
+    const currentUser = sessionStorage.getItem('chat-user');
 
     // 检查输入
     if (!newPassword) {
@@ -89,7 +111,7 @@ document.getElementById('save-password-btn').addEventListener('click', async () 
     }
 
     // 检查密码是否与当前密码相同
-    const currentUserInfo = JSON.parse(localStorage.getItem('user-info') || '{}');
+    const currentUserInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
     if (newPassword === currentUserInfo.password) {
         alert('新密码不能与当前密码相同！');
         return;
@@ -106,10 +128,21 @@ document.getElementById('save-password-btn').addEventListener('click', async () 
     });
     const data = await res.json();
     if (data.ok) {
-        // 更新本地存储的用户信息
-        const userInfo = JSON.parse(localStorage.getItem('user-info') || '{}');
+        // 更新sessionStorage中的用户信息
+        const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
         userInfo.password = newPassword;
-        localStorage.setItem('user-info', JSON.stringify(userInfo));
+        sessionStorage.setItem('user-info', JSON.stringify(userInfo));
+        
+        // 更新localStorage中的会话信息
+        const sessionId = sessionStorage.getItem('chat-session-id');
+        if (sessionId) {
+            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
+            if (sessions[sessionId]) {
+                sessions[sessionId].userInfo = userInfo;
+                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+            }
+        }
+        
         alert('密码修改成功！');
     } else {
         alert('密码修改失败！');
@@ -121,7 +154,7 @@ async function checkUnreadMessages() {
     try {
         const res = await fetch('/api/unread-messages', {
             headers: {
-                'X-User': localStorage.getItem('chat-user')
+                'X-User': sessionStorage.getItem('chat-user')
             }
         });
         const data = await res.json();
@@ -160,7 +193,7 @@ function updateUnreadIndicators(unreadCounts) {
 
 // 加载好友列表
 async function loadFriends() {
-    const res = await fetch('/api/friends?u=' + localStorage.getItem('chat-user'));
+    const res = await fetch('/api/friends?u=' + sessionStorage.getItem('chat-user'));
     const list = await res.json();
     const html = list.map(name => {
         // 为每个好友卡片添加data-friend属性，方便后续扩展
@@ -182,7 +215,7 @@ async function loadFriends() {
 }
 
 // 显示用户名
-document.getElementById('uname').textContent = localStorage.getItem('chat-user');
+document.getElementById('uname').textContent = sessionStorage.getItem('chat-user');
 
 // 初始化加载好友列表
 loadFriends();
@@ -190,7 +223,7 @@ loadFriends();
 // 添加好友按钮点击事件
 document.getElementById('add-friend-btn').addEventListener('click', async () => {
     const friendName = document.getElementById('friend-input').value.trim();
-    const currentUser = localStorage.getItem('chat-user');
+    const currentUser = sessionStorage.getItem('chat-user');
     const feedbackElement = document.getElementById('add-friend-feedback');
 
     // 检查输入
@@ -243,24 +276,21 @@ function showAddFriendFeedback(message, type) {
     }
 }
 
-// 初始化WebSocket连接
-const socket = io();
-
-// 监听未读消息更新事件
-socket.on('unread_update', function(data) {
-    // 当收到未读消息更新通知时，重新检查未读消息
-    checkUnreadMessages();
-});
-
 // 页面加载完成后开始定期检查未读消息
 document.addEventListener('DOMContentLoaded', () => {
-    // 每30秒重新加载好友列表（确保好友列表是最新的）
-    setInterval(loadFriends, 30000);
+    // 每5秒重新加载好友列表和检查未读消息（确保及时更新）
+    setInterval(loadFriends, 5000);
     
     // 连接到自己的房间以接收未读消息更新
-    const currentUser = localStorage.getItem('chat-user');
+    const currentUser = sessionStorage.getItem('chat-user');
     socket.emit('join', {
         username: currentUser,
         friend: currentUser // 加入自己的房间
+    });
+    
+    // 监听未读消息更新事件
+    socket.on('unread_update', function(data) {
+        // 当收到未读消息更新通知时，重新检查未读消息
+        checkUnreadMessages();
     });
 });

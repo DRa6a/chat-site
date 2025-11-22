@@ -358,6 +358,42 @@ input.glass::placeholder {
     margin-bottom: 20px;
 }
 
+.settings-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--font-color);
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 5px;
+}
+
+/* 关于区域 */
+.about-section {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 15px;
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+}
+
+.about-section p {
+    margin: 5px 0;
+}
+
+.changelog h4 {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.changelog ul {
+    margin-top: 0;
+    padding-left: 20px;
+}
+
+.changelog li {
+    margin-bottom: 5px;
+}
+
 /* 输入组 */
 .input-group {
     display: flex;

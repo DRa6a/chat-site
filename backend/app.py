@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify, render_template
 import json, pathlib, os
 from datetime import datetime
 from flask_socketio import SocketIO, emit, join_room, leave_room
+import threading
+import time
 
 app = Flask(__name__,
             template_folder='../frontend',
@@ -11,15 +13,68 @@ app = Flask(__name__,
 app.config['SECRET_KEY'] = 'your-secret-key'
 
 # 初始化SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+
+# 请求统计相关
+class RequestStatistics:
+    def __init__(self):
+        self.stats = {}
+        self.lock = threading.Lock()
+        self.last_print_time = time.time()
+        
+    def record_request(self, endpoint, status_code):
+        with self.lock:
+            key = f"{endpoint}:{status_code}"
+            if key not in self.stats:
+                self.stats[key] = 0
+            self.stats[key] += 1
+            
+            # 每30秒打印一次统计信息
+            current_time = time.time()
+            if current_time - self.last_print_time > 30:
+                self.print_statistics()
+                self.last_print_time = current_time
+                
+    def print_statistics(self):
+        if self.stats:
+            print("=== 请求统计 ===")
+            for key, count in self.stats.items():
+                print(f"  {key} - {count} 次")
+            print("===============")
+            # 重置统计
+            self.stats.clear()
+
+# 创建全局统计对象
+request_stats = RequestStatistics()
+
+# 自定义日志处理
+import logging
+from werkzeug.serving import WSGIRequestHandler
+
+# 保存原始日志方法
+original_log = WSGIRequestHandler.log
+
+def custom_log(self, type, message, *args):
+    # 只记录错误日志，忽略常规访问日志
+    if type != 'info':
+        original_log(self, type, message, *args)
+
+# 应用自定义日志处理
+WSGIRequestHandler.log = custom_log
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 USER_FILE = ROOT / 'data' / 'users.json'
 FRIENDS_DIR = ROOT / 'data' / 'users'
-CHATS_DIR = ROOT / 'data' / 'chats'
 DB_FILE = ROOT / 'data' / 'chat.db'
 os.makedirs(FRIENDS_DIR, exist_ok=True)
-os.makedirs(CHATS_DIR, exist_ok=True)
+
+# 在每个路由后记录统计信息
+@app.after_request
+def after_request(response):
+    # 记录特定端点的请求统计（排除静态文件）
+    if not request.path.startswith('/static'):
+        request_stats.record_request(request.path, response.status_code)
+    return response
 
 def init_db():
     """初始化数据库"""
@@ -68,11 +123,6 @@ def save_users(users):
     with open(USER_FILE, 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
-def get_chat_file(user1, user2):
-    """获取聊天记录文件路径，确保两个用户间的聊天使用相同的文件"""
-    chat_id = "_".join(sorted([user1, user2]))
-    return CHATS_DIR / f"{chat_id}.json"
-
 def load_chat_history(user1, user2):
     """加载两个用户之间的聊天记录"""
     # 首先尝试从数据库加载
@@ -99,11 +149,7 @@ def load_chat_history(user1, user2):
         conn.close()
         return messages
     except Exception as e:
-        # 如果数据库出错，回退到文件系统
-        chat_file = get_chat_file(user1, user2)
-        if chat_file.exists():
-            with open(chat_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        print(f"加载聊天历史时出错: {e}")
         return []
 
 def save_chat_message(user1, user2, sender, content):
@@ -134,31 +180,13 @@ def save_chat_message(user1, user2, sender, content):
         # 同时通知接收方首页更新未读消息数
         socketio.emit('unread_update', {'recipient': user2}, room=user2)
         
+        # 通知发送方首页更新未读消息数（对于其他会话）
+        socketio.emit('unread_update', {'recipient': sender}, room=sender)
+        
         return message_id
     except Exception as e:
         print(f"保存到数据库时出错: {e}")
         return None
-    
-    # 同时保存到文件系统（为了向后兼容）
-    chat_file = get_chat_file(user1, user2)
-    messages = []
-    if chat_file.exists():
-        try:
-            with open(chat_file, 'r', encoding='utf-8') as f:
-                messages = json.load(f)
-        except:
-            messages = []
-    
-    message = {
-        "sender": sender,
-        "content": content,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    messages.append(message)
-    
-    with open(chat_file, 'w', encoding='utf-8') as f:
-        json.dump(messages, f, ensure_ascii=False, indent=4)
 
 @app.route('/')
 def index():
@@ -282,6 +310,9 @@ def api_send_message():
     message_id = save_chat_message(current_user, recipient, current_user, content)
     
     if message_id:
+        # 立即触发一次额外的未读消息检查，确保快速更新
+        socketio.emit('unread_update', {'recipient': recipient}, room=recipient)
+        socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
         return jsonify({'ok': True, 'msg': '消息发送成功', 'message_id': message_id})
     else:
         return jsonify({'ok': False, 'msg': '消息发送失败'}), 500
@@ -344,23 +375,10 @@ def api_unread_messages():
         conn.close()
     except Exception as e:
         print(f"检查未读消息时出错: {e}")
-        # 出错时回退到旧的简单实现
-        friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
-        if friend_file.exists():
-            friends_list = json.loads(friend_file.read_text())
-        else:
-            friends_list = [current_user]
-        
-        # 检查每个好友的聊天记录，统计未读消息
+        # 出错时返回空的未读消息计数
         for friend in friends_list:
-            if friend != current_user:  # 不统计自己
-                history = load_chat_history(current_user, friend)
-                # 统计对方发送的消息数量（简单实现，实际项目中应该有更精确的已读未读标记）
-                count = 0
-                for msg in history:
-                    if msg['sender'] != current_user:
-                        count += 1
-                unread_counts[friend] = count
+            if friend != current_user:
+                unread_counts[friend] = 0
     
     return jsonify({'ok': True, 'unread_counts': unread_counts})
 
@@ -403,13 +421,19 @@ def api_mark_messages_as_read():
         conn.commit()
         conn.close()
         
-        # 通知发送方更新未读消息数
-        socketio.emit('unread_update', {'recipient': current_user}, room=friend)
+        # 通知所有相关会话更新未读消息数
+        socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
+        socketio.emit('unread_update', {'recipient': friend}, room=friend)
         
         return jsonify({'ok': True, 'marked_count': len(unread_message_ids)})
     except Exception as e:
         print(f"标记消息为已读时出错: {e}")
         return jsonify({'ok': False, 'msg': '标记消息为已读失败'}), 500
+
+@app.route('/flowStatistics')
+def flow_statistics():
+    """处理对/flowStatistics的请求，避免404日志"""
+    return '', 204  # 返回204 No Content状态码
 
 # WebSocket事件处理
 @socketio.on('join')

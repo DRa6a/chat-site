@@ -1,7 +1,7 @@
 // 聊天功能实现
 class ChatApp {
     constructor() {
-        this.me = localStorage.getItem('chat-user');
+        this.me = sessionStorage.getItem('chat-user');
         this.peer = document.getElementById('peername').textContent;
         this.messages = [];
         this.pollingInterval = null;
