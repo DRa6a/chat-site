@@ -288,6 +288,50 @@ def api_add_friend():
 
     return jsonify({'ok': True, 'msg': '好友添加成功'})
 
+@app.route('/api/remove-friend', methods=['POST'])
+def api_remove_friend():
+    """删除好友"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    friend_name = request.json.get('friendName', '').strip()
+
+    # 验证当前用户是否存在
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+
+    # 验证好友是否存在
+    if friend_name not in users:
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+
+    try:
+        # 读取当前用户的好友列表
+        friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
+        if friend_file.exists():
+            current_user_friends = json.loads(friend_file.read_text())
+        else:
+            current_user_friends = [current_user]
+
+        # 读取被删除用户的好友列表
+        friend_friend_file = FRIENDS_DIR / f"{friend_name}.friends.json"
+        if friend_friend_file.exists():
+            friend_friends = json.loads(friend_friend_file.read_text())
+        else:
+            friend_friends = [friend_name]
+
+        # 从当前用户好友列表中删除好友
+        if friend_name in current_user_friends:
+            current_user_friends.remove(friend_name)
+            friend_file.write_text(json.dumps(current_user_friends, ensure_ascii=False, indent=4))
+
+        # 从好友的好友列表中删除当前用户
+        if current_user in friend_friends:
+            friend_friends.remove(current_user)
+            friend_friend_file.write_text(json.dumps(friend_friends, ensure_ascii=False, indent=4))
+
+        return jsonify({'ok': True, 'msg': '好友删除成功'})
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': '删除好友失败'}), 500
+
 @app.route('/api/send-message', methods=['POST'])
 def api_send_message():
     """发送消息API"""
@@ -334,6 +378,37 @@ def api_chat_history():
     # 获取聊天历史
     history = load_chat_history(current_user, friend)
     return jsonify({'ok': True, 'history': history})
+
+@app.route('/api/clear-chat-history', methods=['POST'])
+def api_clear_chat_history():
+    """清空聊天记录"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    friend_name = request.json.get('friendName', '').strip()
+
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+
+    if friend_name not in users:
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 删除两个用户之间的所有消息记录
+        cursor.execute('''
+            DELETE FROM messages 
+            WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
+        ''', (current_user, friend_name, friend_name, current_user))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'ok': True, 'msg': '聊天记录已清空'})
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': '清空聊天记录失败'}), 500
 
 @app.route('/api/unread-messages')
 def api_unread_messages():

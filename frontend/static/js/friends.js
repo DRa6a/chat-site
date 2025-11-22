@@ -273,6 +273,67 @@ class ChatApp {
         }
     }
 
+    // 删除好友
+    async removeFriend() {
+        if (confirm(`确定要删除好友 ${this.peer} 吗？`)) {
+            try {
+                const response = await fetch('/api/remove-friend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User': this.me
+                    },
+                    body: JSON.stringify({
+                        friendName: this.peer
+                    })
+                });
+
+                const result = await response.json();
+                if (result.ok) {
+                    alert('好友删除成功');
+                    // 跳转回好友列表页面
+                    location.href = '/';
+                } else {
+                    alert(result.msg || '删除好友失败');
+                }
+            } catch (error) {
+                console.error('删除好友出错:', error);
+                alert('删除好友失败');
+            }
+        }
+    }
+
+    // 清空聊天记录
+    async clearChatHistory() {
+        if (confirm(`确定要清空与 ${this.peer} 的所有聊天记录吗？此操作不可恢复！`)) {
+            try {
+                const response = await fetch('/api/clear-chat-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User': this.me
+                    },
+                    body: JSON.stringify({
+                        friendName: this.peer
+                    })
+                });
+
+                const result = await response.json();
+                if (result.ok) {
+                    alert('聊天记录已清空');
+                    // 清空聊天界面
+                    document.getElementById('chat-messages').innerHTML = '';
+                    this.lastMessageCount = 0;
+                } else {
+                    alert(result.msg || '清空聊天记录失败');
+                }
+            } catch (error) {
+                console.error('清空聊天记录出错:', error);
+                alert('清空聊天记录失败');
+            }
+        }
+    }
+
     scrollToBottom() {
         const container = document.getElementById('chat-messages');
         container.scrollTop = container.scrollHeight;
@@ -289,6 +350,63 @@ let chatApp = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     chatApp = new ChatApp();
+    
+    // 添加聊天设置相关事件监听
+    const chatSettingsBtn = document.getElementById('chat-settings-btn');
+    const chatSettingsModal = document.getElementById('chat-settings-modal');
+    const closeChatSettings = document.getElementById('close-chat-settings');
+    const editNicknameBtn = document.getElementById('edit-nickname-btn');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    const deleteFriendBtn = document.getElementById('delete-friend-btn');
+    const peerName = document.getElementById('peername').textContent;
+
+    if (chatSettingsBtn && chatSettingsModal) {
+        // 打开设置模态框
+        chatSettingsBtn.addEventListener('click', function() {
+            chatSettingsModal.style.display = 'block';
+        });
+
+        // 关闭设置模态框的统一方法
+        function closeSettings() {
+            chatSettingsModal.style.display = 'none';
+        }
+
+        // 绑定关闭事件
+        closeChatSettings.addEventListener('click', closeSettings);
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', function(event) {
+            if (event.target === chatSettingsModal) {
+                closeSettings();
+            }
+        });
+
+        // 修改好友昵称
+        editNicknameBtn.addEventListener('click', function() {
+            const newNickname = prompt('请输入新的昵称:', peerName);
+            if (newNickname && newNickname.trim() !== '' && newNickname !== peerName) {
+                // 这里应该调用后端API来保存昵称
+                alert('功能开发中：修改好友昵称功能');
+            }
+            closeSettings();
+        });
+
+        // 清空聊天记录
+        clearChatBtn.addEventListener('click', function() {
+            if (chatApp) {
+                chatApp.clearChatHistory();
+            }
+            closeSettings();
+        });
+
+        // 删除好友
+        deleteFriendBtn.addEventListener('click', function() {
+            if (chatApp) {
+                chatApp.removeFriend();
+            }
+            closeSettings();
+        });
+    }
 });
 
 // 页面卸载时清理资源
