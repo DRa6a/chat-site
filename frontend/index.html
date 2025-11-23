@@ -9,53 +9,37 @@
     <script>
         // 在页面加载前检测并应用主题，避免闪烁
         (function() {
-            const theme = localStorage.getItem('theme');
-            if (theme === 'dark') {
-                document.documentElement.classList.add('theme-dark');
+            try {
+                const theme = localStorage.getItem('theme');
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('theme-dark');
+                }
+            } catch(e) {
+                console.log('无法访问localStorage:', e);
             }
         })();
     </script>
     <script>
-        // 检查会话状态
+        // 简化会话检查
         (function() {
-            // 从sessionStorage获取当前会话ID
-            const sessionId = sessionStorage.getItem('chat-session-id');
-            if (sessionId) {
-                // 从localStorage获取会话信息
-                const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
-                const session = sessions[sessionId];
-                if (session) {
-                    // 检查会话是否过期（例如超过24小时）
-                    const now = Date.now();
-                    if (now - session.timestamp < 24 * 60 * 60 * 1000) {
-                        // 会话有效，更新时间戳
-                        session.timestamp = now;
-                        sessions[sessionId] = session;
-                        localStorage.setItem('chat-sessions', JSON.stringify(sessions));
-                    } else {
-                        // 会话过期，清理
-                        delete sessions[sessionId];
-                        localStorage.setItem('chat-sessions', JSON.stringify(sessions));
-                        sessionStorage.removeItem('chat-session-id');
-                        sessionStorage.removeItem('chat-user');
-                        sessionStorage.removeItem('user-info');
-                        location.href = '/login';
-                        return;
-                    }
-                } else {
-                    // 会话不存在，跳转到登录页
+            console.log('开始检查会话状态...');
+            
+            try {
+                // 从sessionStorage获取用户信息
+                const user = sessionStorage.getItem('chat-user');
+                console.log('当前用户:', user);
+                
+                if (!user) {
+                    console.log('用户未登录，跳转到登录页');
                     location.href = '/login';
                     return;
                 }
-            } else {
-                // 没有会话ID，跳转到登录页
+                
+                console.log('用户已登录:', user);
+            } catch(e) {
+                console.log('会话检查出错，跳转到登录页:', e);
                 location.href = '/login';
-                return;
             }
-            
-            // 设置用户信息
-            const user = JSON.parse(sessionStorage.getItem('user-info') || '{}');
-            if (!user.username) location.href = '/login';
         })();
     </script>
 </head>
@@ -122,7 +106,7 @@
             <div class="settings-section">
                 <h3>关于</h3>
                 <div class="about-section">
-                    <p><strong>版本:</strong> v1.1.1</p>
+                    <p><strong>版本:</strong> v1.1.2</p>
                     <div class="changelog">
                         <h4>更新日志:</h4>
                         <ul>
@@ -137,6 +121,7 @@
                             <li>支持多标签页独立登录</li>
                             <li>优化日志输出，合并统计信息显示，保持高频轮询确保消息实时性</li>
                             <li>优化聊天页面设置功能，移除冗余取消按钮</li>
+                            <li>修复夸克浏览器兼容性问题</li>
                         </ul>
                     </div>
                 </div>

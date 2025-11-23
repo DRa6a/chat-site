@@ -1,7 +1,12 @@
 // 聊天功能实现
 class ChatApp {
     constructor() {
-        this.me = sessionStorage.getItem('chat-user');
+        try {
+            this.me = sessionStorage.getItem('chat-user');
+        } catch(e) {
+            console.error('获取用户信息时出错:', e);
+            this.me = null;
+        }
         this.peer = document.getElementById('peername').textContent;
         this.messages = [];
         this.pollingInterval = null;
@@ -38,7 +43,11 @@ class ChatApp {
         document.getElementById('theme-cb').addEventListener('change', (e) => {
             const html = document.documentElement;
             html.classList.toggle('theme-dark', e.target.checked);
-            localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+            try {
+                localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+            } catch(e) {
+                console.log('无法访问localStorage:', e);
+            }
         });
 
         // 页面获得焦点时清除新消息提示
@@ -50,9 +59,13 @@ class ChatApp {
     loadTheme() {
         const themeCb = document.getElementById('theme-cb');
         const html = document.documentElement;
-        if (localStorage.getItem('theme') === 'dark') {
-            html.classList.add('theme-dark');
-            themeCb.checked = true;
+        try {
+            if (localStorage.getItem('theme') === 'dark') {
+                html.classList.add('theme-dark');
+                themeCb.checked = true;
+            }
+        } catch(e) {
+            console.log('无法访问localStorage:', e);
         }
     }
 
@@ -111,6 +124,9 @@ class ChatApp {
         `;
 
         container.appendChild(messageElement);
+        
+        // 确保消息容器滚动到底部
+        container.scrollTop = container.scrollHeight;
     }
 
     escapeHtml(text) {
@@ -336,7 +352,11 @@ class ChatApp {
 
     scrollToBottom() {
         const container = document.getElementById('chat-messages');
-        container.scrollTop = container.scrollHeight;
+        // 使用平滑滚动到底部
+        container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+        });
     }
 
     destroy() {

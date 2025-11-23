@@ -2,9 +2,13 @@
 document.getElementById('settings-btn').addEventListener('click', () => {
     document.getElementById('settings-modal').style.display = 'block';
     // 填充当前用户名和密码
-    const user = JSON.parse(sessionStorage.getItem('user-info') || '{}');
-    document.getElementById('username-input').value = user.username || '';
-    document.getElementById('password-input').value = user.password || ''; // 显示当前密码
+    try {
+        const user = JSON.parse(sessionStorage.getItem('user-info') || '{}');
+        document.getElementById('username-input').value = user.username || '';
+        document.getElementById('password-input').value = user.password || ''; // 显示当前密码
+    } catch(e) {
+        console.error('解析用户信息时出错:', e);
+    }
 });
 
 // 关闭按钮点击事件
@@ -15,18 +19,13 @@ document.getElementById('close-settings').addEventListener('click', () => {
 // 退出登录按钮点击事件（模态框按钮）
 document.getElementById('logout-btn').addEventListener('click', () => {
     if (confirm('确定要退出登录吗？')) {
-        // 获取当前会话ID
-        const sessionId = sessionStorage.getItem('chat-session-id');
-        if (sessionId) {
-            // 从localStorage中移除当前会话
-            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
-            delete sessions[sessionId];
-            localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+        try {
+            // 清除sessionStorage中的用户信息
+            sessionStorage.removeItem('chat-user');
+            sessionStorage.removeItem('user-info');
+        } catch(e) {
+            console.error('退出登录时出错:', e);
         }
-        // 清除sessionStorage中的用户信息
-        sessionStorage.removeItem('chat-session-id');
-        sessionStorage.removeItem('chat-user');
-        sessionStorage.removeItem('user-info');
         location.href = '/login';
     }
 });
@@ -34,13 +33,22 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 // 主题切换
 const themeCb = document.getElementById('theme-cb');
 const html = document.documentElement;
-if (localStorage.getItem('theme') === 'dark') {
-    html.classList.add('theme-dark');
-    themeCb.checked = true;
+try {
+    if (localStorage.getItem('theme') === 'dark') {
+        html.classList.add('theme-dark');
+        themeCb.checked = true;
+    }
+} catch(e) {
+    console.log('无法访问localStorage:', e);
 }
+
 themeCb.addEventListener('change', e => {
-    html.classList.toggle('theme-dark', e.target.checked);
-    localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+    try {
+        html.classList.toggle('theme-dark', e.target.checked);
+        localStorage.setItem('theme', e.target.checked ? 'dark' : 'light');
+    } catch(e) {
+        console.log('无法访问localStorage:', e);
+    }
 });
 
 // 保存用户名按钮点击事件
@@ -70,22 +78,17 @@ document.getElementById('save-username-btn').addEventListener('click', async () 
     });
     const data = await res.json();
     if (data.ok) {
-        sessionStorage.setItem('chat-user', newUsername);
-        document.getElementById('uname').textContent = newUsername;
-        // 更新sessionStorage中的用户信息
-        const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
-        userInfo.username = newUsername;
-        sessionStorage.setItem('user-info', JSON.stringify(userInfo));
-        
-        // 更新localStorage中的会话信息
-        const sessionId = sessionStorage.getItem('chat-session-id');
-        if (sessionId) {
-            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
-            if (sessions[sessionId]) {
-                sessions[sessionId].user = newUsername;
-                sessions[sessionId].userInfo = userInfo;
-                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
-            }
+        try {
+            sessionStorage.setItem('chat-user', newUsername);
+            document.getElementById('uname').textContent = newUsername;
+            // 更新sessionStorage中的用户信息
+            const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
+            userInfo.username = newUsername;
+            sessionStorage.setItem('user-info', JSON.stringify(userInfo));
+        } catch(e) {
+            console.error('更新会话信息时出错:', e);
+            alert('会话信息更新失败！');
+            return;
         }
         
         alert('用户名修改成功！');
@@ -128,19 +131,15 @@ document.getElementById('save-password-btn').addEventListener('click', async () 
     });
     const data = await res.json();
     if (data.ok) {
-        // 更新sessionStorage中的用户信息
-        const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
-        userInfo.password = newPassword;
-        sessionStorage.setItem('user-info', JSON.stringify(userInfo));
-        
-        // 更新localStorage中的会话信息
-        const sessionId = sessionStorage.getItem('chat-session-id');
-        if (sessionId) {
-            const sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
-            if (sessions[sessionId]) {
-                sessions[sessionId].userInfo = userInfo;
-                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
-            }
+        try {
+            // 更新sessionStorage中的用户信息
+            const userInfo = JSON.parse(sessionStorage.getItem('user-info') || '{}');
+            userInfo.password = newPassword;
+            sessionStorage.setItem('user-info', JSON.stringify(userInfo));
+        } catch(e) {
+            console.error('更新会话信息时出错:', e);
+            alert('会话信息更新失败！');
+            return;
         }
         
         alert('密码修改成功！');
@@ -193,29 +192,37 @@ function updateUnreadIndicators(unreadCounts) {
 
 // 加载好友列表
 async function loadFriends() {
-    const res = await fetch('/api/friends?u=' + sessionStorage.getItem('chat-user'));
-    const list = await res.json();
-    const html = list.map(name => {
-        // 为每个好友卡片添加data-friend属性，方便后续扩展
-        return `
-        <div class="friend-card glass" data-friend="${name}">
-            <span class="fname">${name}</span>
-        </div>`;
-    }).join('');
-    document.getElementById('fcards').innerHTML = html;
+    try {
+        const res = await fetch('/api/friends?u=' + sessionStorage.getItem('chat-user'));
+        const list = await res.json();
+        const html = list.map(name => {
+            // 为每个好友卡片添加data-friend属性，方便后续扩展
+            return `
+            <div class="friend-card glass" data-friend="${name}">
+                <span class="fname">${name}</span>
+            </div>`;
+        }).join('');
+        document.getElementById('fcards').innerHTML = html;
 
-    document.querySelectorAll('.friend-card').forEach(card => {
-        card.addEventListener('click', () => {
-            location.href = '/chat/' + card.dataset.friend;
+        document.querySelectorAll('.friend-card').forEach(card => {
+            card.addEventListener('click', () => {
+                location.href = '/chat/' + card.dataset.friend;
+            });
         });
-    });
-    
-    // 加载完成后检查未读消息
-    checkUnreadMessages();
+        
+        // 加载完成后检查未读消息
+        checkUnreadMessages();
+    } catch(e) {
+        console.error('加载好友列表时出错:', e);
+    }
 }
 
 // 显示用户名
-document.getElementById('uname').textContent = sessionStorage.getItem('chat-user');
+try {
+    document.getElementById('uname').textContent = sessionStorage.getItem('chat-user');
+} catch(e) {
+    console.error('获取用户名时出错:', e);
+}
 
 // 初始化加载好友列表
 loadFriends();
@@ -283,14 +290,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 连接到自己的房间以接收未读消息更新
     const currentUser = sessionStorage.getItem('chat-user');
-    socket.emit('join', {
-        username: currentUser,
-        friend: currentUser // 加入自己的房间
-    });
-    
-    // 监听未读消息更新事件
-    socket.on('unread_update', function(data) {
-        // 当收到未读消息更新通知时，重新检查未读消息
-        checkUnreadMessages();
-    });
+    if (socket && currentUser) {
+        socket.emit('join', {
+            username: currentUser,
+            friend: currentUser // 加入自己的房间
+        });
+        
+        // 监听未读消息更新事件
+        socket.on('unread_update', function(data) {
+            // 当收到未读消息更新通知时，重新检查未读消息
+            checkUnreadMessages();
+        });
+    }
 });
