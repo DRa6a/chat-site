@@ -101,23 +101,13 @@ class ChatApp {
         }
     }
 
-    addMessageToUI(message, isOwnMessage = false, showTime = true) {
+    addMessageToUI(message, isOwnMessage = false) {
         const container = document.getElementById('chat-messages');
         const messageElement = document.createElement('div');
         messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
 
-        let timeHTML = '';
-        if (showTime) {
-            const timeString = new Date(message.timestamp).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            timeHTML = `<div class="message-time">${timeString}</div>`;
-        }
-
         messageElement.innerHTML = `
             <div class="message-content">${this.escapeHtml(message.content)}</div>
-            ${timeHTML}
         `;
 
         container.appendChild(messageElement);
@@ -169,7 +159,12 @@ class ChatApp {
                         }
                     }
                     
-                    this.addMessageToUI(message, isOwnMessage, showTime);
+                    // 如果需要显示时间，则添加时间分隔符
+                    if (showTime) {
+                        this.addTimeDivider(message.timestamp);
+                    }
+                    
+                    this.addMessageToUI(message, isOwnMessage);
                 });
 
                 this.lastMessageCount = result.history.length;
@@ -180,6 +175,21 @@ class ChatApp {
         } catch (error) {
             console.error('加载聊天历史出错:', error);
         }
+    }
+
+    // 新增：添加时间分隔符
+    addTimeDivider(timestamp) {
+        const container = document.getElementById('chat-messages');
+        const dividerElement = document.createElement('div');
+        dividerElement.className = 'time-divider';
+        
+        const timeString = new Date(timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        dividerElement.textContent = timeString;
+        container.appendChild(dividerElement);
     }
 
     // 标记当前聊天消息为已读
@@ -244,7 +254,12 @@ class ChatApp {
                             }
                         }
                         
-                        this.addMessageToUI(message, isOwnMessage, showTime);
+                        // 如果需要显示时间，则添加时间分隔符
+                        if (showTime) {
+                            this.addTimeDivider(message.timestamp);
+                        }
+                        
+                        this.addMessageToUI(message, isOwnMessage);
                     }
 
                     this.lastMessageCount = result.history.length;

@@ -791,6 +791,18 @@ input.glass::placeholder {
     opacity: 0.7;
 }
 
+/* 时间分隔符样式 */
+.time-divider {
+    text-align: center;
+    margin: 15px 0;
+    color: #999;
+    font-size: 0.7rem;
+}
+
+.theme-dark .time-divider {
+    color: #aaa;
+}
+
 /* 输入区域 */
 .input-container {
     display: -webkit-flex;
