@@ -283,23 +283,20 @@ function showAddFriendFeedback(message, type) {
     }
 }
 
-// 页面加载完成后开始定期检查未读消息
+// 页面加载完成后检查未读消息
 document.addEventListener('DOMContentLoaded', () => {
-    // 每5秒重新加载好友列表和检查未读消息（确保及时更新）
-    setInterval(loadFriends, 5000);
+    // 初始检查未读消息
+    checkUnreadMessages();
     
-    // 连接到自己的房间以接收未读消息更新
-    const currentUser = sessionStorage.getItem('chat-user');
-    if (socket && currentUser) {
-        socket.emit('join', {
-            username: currentUser,
-            friend: currentUser // 加入自己的房间
-        });
-        
-        // 监听未读消息更新事件
-        socket.on('unread_update', function(data) {
-            // 当收到未读消息更新通知时，重新检查未读消息
-            checkUnreadMessages();
-        });
+    // 每5秒检查一次未读消息
+    setInterval(checkUnreadMessages, 5000);
+});
+
+// 监听来自聊天界面的未读消息更新通知
+window.addEventListener('storage', (event) => {
+    // 检查是否是未读消息更新事件
+    if (event.key === 'unread_updated') {
+        // 收到通知后立即检查未读消息
+        setTimeout(checkUnreadMessages, 100);
     }
 });

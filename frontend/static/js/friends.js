@@ -205,6 +205,13 @@ class ChatApp {
                     friend: this.peer
                 })
             });
+            
+            // 通知首页更新未读消息计数
+            try {
+                localStorage.setItem('unread_updated', Date.now().toString());
+            } catch (e) {
+                console.error('无法更新localStorage:', e);
+            }
         } catch (error) {
             console.error('标记消息为已读出错:', error);
         }
@@ -410,6 +417,8 @@ class ChatApp {
     destroy() {
         // 停止轮询
         this.stopPolling();
+        // 标记消息为已读
+        this.markMessagesAsRead();
     }
 }
 
@@ -418,6 +427,16 @@ let chatApp = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     chatApp = new ChatApp();
+    
+    // 监听返回按钮点击事件
+    const backBtn = document.querySelector('.back-btn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            if (chatApp) {
+                chatApp.markMessagesAsRead();
+            }
+        });
+    }
     
     // 添加聊天设置相关事件监听
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
