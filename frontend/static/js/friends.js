@@ -89,14 +89,7 @@ class ChatApp {
 
             const result = await response.json();
             if (result.ok) {
-                // 添加到UI
-                const message = {
-                    sender: this.me,
-                    content: content,
-                    timestamp: new Date()
-                };
-
-                this.addMessageToUI(message, true);
+                // 不再在这里直接添加消息到UI，而是等待下一次轮询
                 input.value = '';
                 this.scrollToBottom();
                 
@@ -108,19 +101,23 @@ class ChatApp {
         }
     }
 
-    addMessageToUI(message, isOwnMessage = false) {
+    addMessageToUI(message, isOwnMessage = false, showTime = true) {
         const container = document.getElementById('chat-messages');
         const messageElement = document.createElement('div');
         messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
 
-        const timeString = new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        let timeHTML = '';
+        if (showTime) {
+            const timeString = new Date(message.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            timeHTML = `<div class="message-time">${timeString}</div>`;
+        }
 
         messageElement.innerHTML = `
             <div class="message-content">${this.escapeHtml(message.content)}</div>
-            <div class="message-time">${timeString}</div>
+            ${timeHTML}
         `;
 
         container.appendChild(messageElement);
@@ -148,14 +145,31 @@ class ChatApp {
                 const container = document.getElementById('chat-messages');
                 container.innerHTML = '';
 
-                result.history.forEach(msg => {
+                result.history.forEach((msg, index) => {
                     const message = {
                         sender: msg.sender,
                         content: msg.content,
                         timestamp: new Date(msg.timestamp)
                     };
                     const isOwnMessage = msg.sender === this.me;
-                    this.addMessageToUI(message, isOwnMessage);
+                    
+                    // 判断是否显示时间戳
+                    let showTime = true;
+                    if (index > 0) {
+                        const previousMsg = result.history[index - 1];
+                        const previousTime = new Date(previousMsg.timestamp);
+                        const currentTime = new Date(msg.timestamp);
+                        
+                        // 计算时间差（毫秒）
+                        const timeDiff = Math.abs(currentTime - previousTime);
+                        
+                        // 如果时间差小于5分钟（300,000毫秒），不显示时间戳
+                        if (timeDiff < 300000) {
+                            showTime = false;
+                        }
+                    }
+                    
+                    this.addMessageToUI(message, isOwnMessage, showTime);
                 });
 
                 this.lastMessageCount = result.history.length;
@@ -201,20 +215,39 @@ class ChatApp {
                 if (result.history.length > this.lastMessageCount) {
                     // 有新消息，更新显示
                     const newMessageCount = result.history.length - this.lastMessageCount;
-                    this.lastMessageCount = result.history.length;
                     const container = document.getElementById('chat-messages');
-                    container.innerHTML = '';
 
-                    result.history.forEach(msg => {
+                    // 只处理新增的消息，而不是清空整个容器
+                    const startIndex = this.lastMessageCount;
+                    for (let i = startIndex; i < result.history.length; i++) {
+                        const msg = result.history[i];
                         const message = {
                             sender: msg.sender,
                             content: msg.content,
                             timestamp: new Date(msg.timestamp)
                         };
                         const isOwnMessage = msg.sender === this.me;
-                        this.addMessageToUI(message, isOwnMessage);
-                    });
+                        
+                        // 判断是否显示时间戳
+                        let showTime = true;
+                        if (i > 0) {
+                            const previousMsg = result.history[i - 1];
+                            const previousTime = new Date(previousMsg.timestamp);
+                            const currentTime = new Date(msg.timestamp);
+                            
+                            // 计算时间差（毫秒）
+                            const timeDiff = Math.abs(currentTime - previousTime);
+                            
+                            // 如果时间差小于5分钟（300,000毫秒），不显示时间戳
+                            if (timeDiff < 300000) {
+                                showTime = false;
+                            }
+                        }
+                        
+                        this.addMessageToUI(message, isOwnMessage, showTime);
+                    }
 
+                    this.lastMessageCount = result.history.length;
                     this.scrollToBottom();
                     
                     // 如果不是自己发送的消息，则显示新消息提示
