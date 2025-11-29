@@ -80,16 +80,42 @@ document.getElementById('login-form').addEventListener('submit', async e => {
         
         if (data.ok) {
             showFeedback('登录成功! (^▽^)', 'success');
+            // 生成唯一的会话ID
+            const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            // 构造用户信息对象
+            const userInfo = {username: u, password: p};
             
-            // 简化会话管理 - 直接使用 sessionStorage 存储用户信息
             try {
+                // 使用sessionStorage存储用户信息，确保每个标签页独立
+                sessionStorage.setItem('chat-session-id', sessionId);
                 sessionStorage.setItem('chat-user', u);
-                sessionStorage.setItem('user-info', JSON.stringify({username: u, password: p}));
+                sessionStorage.setItem('user-info', JSON.stringify(userInfo));
                 
-                console.log('用户信息保存成功:', u);
+                // 在localStorage中存储会话信息，用于在页面刷新时恢复
+                let sessions = {};
+                try {
+                    sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
+                } catch (e) {
+                    console.error('解析会话信息时出错:', e);
+                    sessions = {};
+                }
+                
+                sessions[sessionId] = {
+                    user: u,
+                    userInfo: userInfo,
+                    timestamp: Date.now()
+                };
+                
+                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
+                
+                console.log('会话信息保存成功:', {
+                    sessionId: sessionId,
+                    user: u,
+                    timestamp: Date.now()
+                });
             } catch(e) {
-                console.error('存储用户信息时出错:', e);
-                showFeedback('用户信息存储失败', 'error');
+                console.error('存储会话信息时出错:', e);
+                showFeedback('会话信息存储失败', 'error');
                 return;
             }
             

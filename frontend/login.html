@@ -8,13 +8,9 @@
     <script>
         // 在页面加载前检测并应用主题，避免闪烁
         (function() {
-            try {
-                const theme = localStorage.getItem('theme');
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('theme-dark');
-                }
-            } catch(e) {
-                console.log('无法访问localStorage:', e);
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('theme-dark');
             }
         })();
     </script>
