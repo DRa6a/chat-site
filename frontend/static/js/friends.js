@@ -456,7 +456,7 @@ class ChatApp {
     }
     
     // 播放音乐
-    async playMusic(musicId, playButton, progressBar, currentTimeEl, durationEl) {
+    async playMusic(musicId, playButton, progressBar, currentTimeEl, durationEl, progressBarContainer) {
         try {
             // 如果正在播放其他音乐，先停止
             if (this.currentAudio) {
@@ -518,6 +518,11 @@ class ChatApp {
                 this.currentAudio.onloadedmetadata = () => {
                     this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
                 };
+                
+                // 添加进度条拖动事件
+                if (progressBarContainer) {
+                    this.setupProgressDragging(progressBarContainer, progressBar, currentTimeEl, durationEl);
+                }
             } else {
                 alert(result.msg || '获取音乐播放链接失败');
             }
@@ -525,6 +530,42 @@ class ChatApp {
             console.error('播放音乐出错:', error);
             alert('播放音乐失败: ' + error.message);
         }
+    }
+    
+    // 设置进度条拖动功能
+    setupProgressDragging(progressBarContainer, progressBar, currentTimeEl, durationEl) {
+        if (!this.currentAudio || !progressBarContainer) return;
+        
+        let isDragging = false;
+        
+        // 点击进度条跳转到指定位置
+        const seek = (e) => {
+            const progressBarRect = progressBarContainer.getBoundingClientRect();
+            const pos = (e.clientX - progressBarRect.left) / progressBarRect.width;
+            const duration = this.currentAudio.duration || 0;
+            if (duration > 0) {
+                this.currentAudio.currentTime = pos * duration;
+                this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
+            }
+        };
+        
+        // 鼠标按下事件
+        progressBarContainer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            seek(e);
+        });
+        
+        // 鼠标移动事件
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                seek(e);
+            }
+        });
+        
+        // 鼠标释放事件
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
     }
     
     // 暂停音乐
@@ -846,6 +887,7 @@ class ChatApp {
             const progressBar = messageElement.querySelector('.music-progress');
             const currentTimeEl = messageElement.querySelector('.music-current-time');
             const durationEl = messageElement.querySelector('.music-duration');
+            const progressBarContainer = messageElement.querySelector('.music-progress-container');
             
             playBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -855,7 +897,7 @@ class ChatApp {
                 const icon = playBtn.querySelector('i');
                 if (icon.classList.contains('fa-play')) {
                     // 播放音乐
-                    this.playMusic(musicId, playBtn, progressBar, currentTimeEl, durationEl);
+                    this.playMusic(musicId, playBtn, progressBar, currentTimeEl, durationEl, progressBarContainer);
                 } else {
                     // 暂停音乐
                     this.pauseMusic();

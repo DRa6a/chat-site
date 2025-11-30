@@ -1293,6 +1293,7 @@ input.glass::placeholder {
     align-items: center;
     gap: 5px;
     min-width: 0; /* 防止内容溢出 */
+    cursor: pointer; /* 添加手型光标表示可点击 */
 }
 
 .music-progress-bar {
@@ -1302,6 +1303,8 @@ input.glass::placeholder {
     border-radius: 2px;
     overflow: hidden;
     min-width: 40px; /* 确保进度条最小宽度 */
+    cursor: pointer; /* 添加手型光标表示可点击 */
+    position: relative; /* 为拖动功能提供相对定位 */
 }
 
 .music-progress {
@@ -1309,6 +1312,26 @@ input.glass::placeholder {
     background: #0078ff;
     border-radius: 2px;
     width: 0%;
+    position: relative; /* 为拖动功能提供相对定位 */
+}
+
+.music-progress::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #0078ff;
+    opacity: 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+
+.music-progress-bar:hover .music-progress::after {
+    opacity: 1;
 }
 
 .music-current-time,
