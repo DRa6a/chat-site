@@ -22,7 +22,7 @@ class ChatApp {
         this.currentAudio = null;
         this.currentPlayingButton = null;
         this.currentProgressInterval = null;
-        
+
         this.init();
     }
 
@@ -34,10 +34,10 @@ class ChatApp {
         this.scrollToBottom();
         // 启动轮询机制，每2秒检查一次新消息
         this.startPolling();
-        
+
         // 创建图片查看器
         this.createImageViewer();
-        
+
         // 创建歌词查看器
         this.createLyricsViewer();
     }
@@ -92,38 +92,54 @@ class ChatApp {
         window.addEventListener('focus', () => {
             this.clearNewMessageIndicator();
         });
-        
+
         // 点击页面其他地方隐藏更多功能面板
         document.addEventListener('click', (e) => {
             const morePanel = document.getElementById('more-panel');
             const moreBtn = document.getElementById('more-btn');
-            
-            if (morePanel.style.display === 'block' && 
-                !morePanel.contains(e.target) && 
+
+            if (morePanel.style.display === 'block' &&
+                !morePanel.contains(e.target) &&
                 e.target !== moreBtn) {
                 this.hideMorePanel();
             }
         });
-        
+
         // 音乐搜索相关事件
         document.getElementById('music-search-btn').addEventListener('click', () => {
             this.searchMusic();
         });
-        
+
         document.getElementById('music-search-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.searchMusic();
             }
         });
-        
+
         document.getElementById('close-music-search').addEventListener('click', () => {
             this.closeMusicSearchModal();
         });
-        
+
+        // 字体大小调整事件
+        const fontSizeSlider = document.getElementById('font-size-slider');
+        if (fontSizeSlider) {
+            fontSizeSlider.addEventListener('input', (e) => {
+                this.setFontSize(e.target.value);
+            });
+        }
+
+        // 页面缩放调整事件
+        const zoomSlider = document.getElementById('zoom-slider');
+        if (zoomSlider) {
+            zoomSlider.addEventListener('input', (e) => {
+                this.setZoomLevel(e.target.value);
+            });
+        }
+
         // 图片查看器事件监听器 (推迟到图片查看器创建后再设置)
         // 这些监听器将在 createImageViewer 方法中设置
     }
-    
+
     // 切换更多功能面板显示/隐藏
     toggleMorePanel() {
         const morePanel = document.getElementById('more-panel');
@@ -133,26 +149,26 @@ class ChatApp {
             this.showMorePanel();
         }
     }
-    
+
     // 显示更多功能面板
     showMorePanel() {
         const morePanel = document.getElementById('more-panel');
         morePanel.style.display = 'block';
     }
-    
+
     // 隐藏更多功能面板
     hideMorePanel() {
         const morePanel = document.getElementById('more-panel');
         morePanel.style.display = 'none';
     }
-    
+
     // 显示音乐搜索模态框
     showMusicSearchModal() {
         const modal = document.getElementById('music-search-modal');
         modal.style.display = 'block';
         document.getElementById('music-search-input').focus();
     }
-    
+
     // 关闭音乐搜索模态框
     closeMusicSearchModal() {
         const modal = document.getElementById('music-search-modal');
@@ -160,7 +176,7 @@ class ChatApp {
         document.getElementById('music-search-input').value = '';
         document.getElementById('music-search-results').innerHTML = '';
     }
-    
+
     // 搜索音乐
     async searchMusic() {
         const keyword = document.getElementById('music-search-input').value.trim();
@@ -168,19 +184,19 @@ class ChatApp {
             alert('请输入搜索关键词');
             return;
         }
-        
+
         try {
             const searchBtn = document.getElementById('music-search-btn');
             const originalHTML = searchBtn.innerHTML;
             searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 搜索';
             searchBtn.disabled = true;
-            
+
             const response = await fetch(`/api/music/search?keyword=${encodeURIComponent(keyword)}`);
             const result = await response.json();
-            
+
             searchBtn.innerHTML = originalHTML;
             searchBtn.disabled = false;
-            
+
             if (result.ok) {
                 this.displayMusicSearchResults(result.songs);
             } else {
@@ -193,23 +209,23 @@ class ChatApp {
             alert('搜索出错: ' + error.message);
         }
     }
-    
+
     // 显示音乐搜索结果
     displayMusicSearchResults(songs) {
         const resultsContainer = document.getElementById('music-search-results');
         resultsContainer.innerHTML = '';
-        
+
         if (songs.length === 0) {
             resultsContainer.innerHTML = '<p style="text-align: center; padding: 20px;">没有找到相关音乐</p>';
             return;
         }
-        
+
         songs.forEach(song => {
             const item = document.createElement('div');
             item.className = 'music-result-item';
             item.innerHTML = `
-                <img src="${song.picUrl || '/static/images/music-placeholder.png'}" 
-                     alt="${song.name}" 
+                <img src="${song.picUrl || '/static/images/music-placeholder.png'}"
+                     alt="${song.name}"
                      class="music-result-cover"
                      onerror="this.src='/static/images/music-placeholder.png'">
                 <div class="music-result-info">
@@ -217,20 +233,20 @@ class ChatApp {
                     <div class="music-result-artists">${this.escapeHtml(song.artists.join(', '))}</div>
                 </div>
             `;
-            
+
             item.addEventListener('click', () => {
                 this.sendMusicMessage(song);
             });
-            
+
             resultsContainer.appendChild(item);
         });
     }
-    
+
     // 发送音乐消息
     async sendMusicMessage(musicInfo) {
         try {
             const musicMessage = `Music_${JSON.stringify(musicInfo)}`;
-            
+
             const response = await fetch('/api/send-message', {
                 method: 'POST',
                 headers: {
@@ -256,7 +272,7 @@ class ChatApp {
             alert('发送音乐消息失败: ' + error.message);
         }
     }
-    
+
     // 创建图片查看器
     createImageViewer() {
         const imageViewerModal = document.createElement('div');
@@ -286,13 +302,13 @@ class ChatApp {
                 </div>
             </div>
         `;
-        
+
         document.body.appendChild(imageViewerModal);
-        
+
         // 现在设置图片查看器的事件监听器
         this.setupImageViewerListeners();
     }
-    
+
     setupImageViewerListeners() {
         // 确保图片查看器元素存在
         const imageViewerModal = document.getElementById('image-viewer-modal');
@@ -300,47 +316,47 @@ class ChatApp {
             console.error('图片查看器模态框未找到');
             return;
         }
-        
+
         const closeImageViewer = document.getElementById('close-image-viewer');
         const prevImageBtn = document.getElementById('prev-image');
         const nextImageBtn = document.getElementById('next-image');
         const downloadImageBtn = document.getElementById('download-image');
-        
+
         // 关闭图片查看器
         if (closeImageViewer) {
             closeImageViewer.addEventListener('click', () => {
                 this.closeImageViewer();
             });
         }
-        
+
         // 点击模态框外部关闭
         imageViewerModal.addEventListener('click', (event) => {
             if (event.target === imageViewerModal) {
                 this.closeImageViewer();
             }
         });
-        
+
         // 上一张图片
         if (prevImageBtn) {
             prevImageBtn.addEventListener('click', () => {
                 this.showPrevImage();
             });
         }
-        
+
         // 下一张图片
         if (nextImageBtn) {
             nextImageBtn.addEventListener('click', () => {
                 this.showNextImage();
             });
         }
-        
+
         // 下载图片
         if (downloadImageBtn) {
             downloadImageBtn.addEventListener('click', () => {
                 this.downloadCurrentImage();
             });
         }
-        
+
         // 键盘事件（ESC关闭，左右箭头切换图片）
         document.addEventListener('keydown', (event) => {
             const imageViewerModal = document.getElementById('image-viewer-modal');
@@ -359,7 +375,7 @@ class ChatApp {
             }
         });
     }
-    
+
     // 创建歌词查看器
     createLyricsViewer() {
         const lyricsModal = document.createElement('div');
@@ -373,39 +389,39 @@ class ChatApp {
                 <div class="lyrics-text">加载中...</div>
             </div>
         `;
-        
+
         document.body.appendChild(lyricsModal);
-        
+
         // 设置事件监听器
         const closeBtn = lyricsModal.querySelector('.lyrics-close');
         closeBtn.addEventListener('click', () => {
             this.closeLyricsViewer();
         });
-        
+
         lyricsModal.addEventListener('click', (event) => {
             if (event.target === lyricsModal) {
                 this.closeLyricsViewer();
             }
         });
     }
-    
+
     // 显示歌词
     async showLyrics(musicId, musicTitle, musicArtist) {
         const lyricsModal = document.getElementById('lyrics-modal');
         const titleEl = lyricsModal.querySelector('.lyrics-title');
         const artistEl = lyricsModal.querySelector('.lyrics-artist');
         const textEl = lyricsModal.querySelector('.lyrics-text');
-        
+
         titleEl.textContent = musicTitle;
         artistEl.textContent = musicArtist;
         textEl.textContent = '加载中...';
-        
+
         lyricsModal.style.display = 'block';
-        
+
         try {
             const response = await fetch(`/api/music/lyric?id=${musicId}`);
             const result = await response.json();
-            
+
             if (result.ok) {
                 textEl.textContent = result.lyric || '暂无歌词';
             } else {
@@ -416,45 +432,45 @@ class ChatApp {
             textEl.textContent = '加载歌词出错';
         }
     }
-    
+
     // 关闭歌词查看器
     closeLyricsViewer() {
         const lyricsModal = document.getElementById('lyrics-modal');
         lyricsModal.style.display = 'none';
     }
-    
+
     // 更新进度条
     updateProgress(audioElement, progressBar, currentTimeEl, durationEl) {
         if (!audioElement || !progressBar) return;
-        
+
         const currentTime = audioElement.currentTime;
         const duration = audioElement.duration || 0;
-        
+
         // 更新进度条
         if (duration > 0) {
             const progressPercent = (currentTime / duration) * 100;
             progressBar.style.width = `${progressPercent}%`;
         }
-        
+
         // 更新时间显示
         if (currentTimeEl) {
             currentTimeEl.textContent = this.formatTime(currentTime);
         }
-        
+
         if (durationEl && duration > 0) {
             durationEl.textContent = this.formatTime(duration);
         }
     }
-    
+
     // 格式化时间 (秒 -> mm:ss)
     formatTime(seconds) {
         if (isNaN(seconds)) return '00:00';
-        
+
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
-    
+
     // 播放音乐
     async playMusic(musicId, playButton, progressBar, currentTimeEl, durationEl, progressBarContainer) {
         try {
@@ -470,29 +486,29 @@ class ChatApp {
                     this.currentProgressInterval = null;
                 }
             }
-            
+
             // 获取音乐播放链接
             const response = await fetch(`/api/music/url?id=${musicId}`);
             const result = await response.json();
-            
+
             if (result.ok) {
                 // 创建或更新audio元素
                 if (!this.currentAudio) {
                     this.currentAudio = new Audio();
                 }
-                
+
                 this.currentAudio.src = result.url;
                 this.currentAudio.play();
-                
+
                 // 更新按钮状态
                 playButton.innerHTML = '<i class="fas fa-pause"></i>';
                 this.currentPlayingButton = playButton;
-                
+
                 // 开始定期更新进度条
                 this.currentProgressInterval = setInterval(() => {
                     this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
                 }, 1000);
-                
+
                 // 监听播放结束事件
                 this.currentAudio.onended = () => {
                     playButton.innerHTML = '<i class="fas fa-play"></i>';
@@ -513,12 +529,12 @@ class ChatApp {
                     }
                     this.currentAudio = null;
                 };
-                
+
                 // 监听元数据加载完成事件以获取时长
                 this.currentAudio.onloadedmetadata = () => {
                     this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
                 };
-                
+
                 // 添加进度条拖动事件
                 if (progressBarContainer) {
                     this.setupProgressDragging(progressBarContainer, progressBar, currentTimeEl, durationEl);
@@ -531,13 +547,13 @@ class ChatApp {
             alert('播放音乐失败: ' + error.message);
         }
     }
-    
+
     // 设置进度条拖动功能
     setupProgressDragging(progressBarContainer, progressBar, currentTimeEl, durationEl) {
         if (!this.currentAudio || !progressBarContainer) return;
-        
+
         let isDragging = false;
-        
+
         // 点击进度条跳转到指定位置
         const seek = (e) => {
             const progressBarRect = progressBarContainer.getBoundingClientRect();
@@ -548,26 +564,26 @@ class ChatApp {
                 this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
             }
         };
-        
+
         // 鼠标按下事件
         progressBarContainer.addEventListener('mousedown', (e) => {
             isDragging = true;
             seek(e);
         });
-        
+
         // 鼠标移动事件
         document.addEventListener('mousemove', (e) => {
             if (isDragging) {
                 seek(e);
             }
         });
-        
+
         // 鼠标释放事件
         document.addEventListener('mouseup', () => {
             isDragging = false;
         });
     }
-    
+
     // 暂停音乐
     pauseMusic() {
         if (this.currentAudio) {
@@ -583,20 +599,20 @@ class ChatApp {
             this.currentAudio = null;
         }
     }
-    
+
     // 打开图片查看器
     openImageViewer(imageId, imageElement) {
         // 收集所有图片消息
         this.collectImageMessages();
-        
+
         // 找到点击的图片在数组中的位置
-        this.currentImageIndex = this.imageMessages.findIndex(msg => 
+        this.currentImageIndex = this.imageMessages.findIndex(msg =>
             msg.element === imageElement || msg.id === imageId);
-        
+
         if (this.currentImageIndex === -1) {
             this.currentImageIndex = 0;
         }
-        
+
         // 显示图片查看器
         this.showCurrentImage();
         const imageViewerModal = document.getElementById('image-viewer-modal');
@@ -605,7 +621,7 @@ class ChatApp {
             document.body.style.overflow = 'hidden'; // 防止背景滚动
         }
     }
-    
+
     // 关闭图片查看器
     closeImageViewer() {
         const imageViewerModal = document.getElementById('image-viewer-modal');
@@ -614,7 +630,7 @@ class ChatApp {
             document.body.style.overflow = ''; // 恢复背景滚动
         }
     }
-    
+
     // 收集所有图片消息
     collectImageMessages() {
         const messageElements = document.querySelectorAll('.message-image img');
@@ -623,7 +639,7 @@ class ChatApp {
             const src = img.src;
             const urlParts = src.split('/');
             const imageId = urlParts[urlParts.length - 1];
-            
+
             return {
                 id: imageId,
                 element: img,
@@ -631,17 +647,17 @@ class ChatApp {
             };
         });
     }
-    
+
     // 显示当前图片
     showCurrentImage() {
         if (this.imageMessages.length === 0) return;
-        
+
         const currentImage = this.imageMessages[this.currentImageIndex];
         const viewerImage = document.getElementById('viewer-image');
         if (viewerImage) {
             viewerImage.src = currentImage.src;
         }
-        
+
         // 更新图片信息
         const currentImageIndexElement = document.getElementById('current-image-index');
         const totalImagesElement = document.getElementById('total-images');
@@ -649,7 +665,7 @@ class ChatApp {
             currentImageIndexElement.textContent = this.currentImageIndex + 1;
             totalImagesElement.textContent = this.imageMessages.length;
         }
-        
+
         // 控制导航按钮的显示
         const prevImageBtn = document.getElementById('prev-image');
         const nextImageBtn = document.getElementById('next-image');
@@ -658,7 +674,7 @@ class ChatApp {
             nextImageBtn.disabled = this.currentImageIndex === this.imageMessages.length - 1;
         }
     }
-    
+
     // 显示上一张图片
     showPrevImage() {
         if (this.currentImageIndex > 0) {
@@ -666,7 +682,7 @@ class ChatApp {
             this.showCurrentImage();
         }
     }
-    
+
     // 显示下一张图片
     showNextImage() {
         if (this.currentImageIndex < this.imageMessages.length - 1) {
@@ -674,11 +690,11 @@ class ChatApp {
             this.showCurrentImage();
         }
     }
-    
+
     // 下载当前图片
     downloadCurrentImage() {
         if (this.imageMessages.length === 0) return;
-        
+
         const currentImage = this.imageMessages[this.currentImageIndex];
         const link = document.createElement('a');
         link.href = currentImage.src;
@@ -724,7 +740,7 @@ class ChatApp {
                 // 不再在这里直接添加消息到UI，而是等待下一次轮询
                 input.value = '';
                 this.scrollToBottom();
-                
+
                 // 立即检查新消息以确保显示最新内容
                 setTimeout(() => this.checkForNewMessages(), 100);
             } else {
@@ -743,14 +759,14 @@ class ChatApp {
         try {
             // 显示上传中提示
             const sendButton = document.getElementById('send-btn');
-            const uploadButton = document.getElementById('upload-btn');
+            const morePanelBtn = document.getElementById('upload-image-btn');
             const originalSendText = sendButton.innerHTML;
-            const originalUploadText = uploadButton.innerHTML;
-            
+            const originalMorePanelBtnHTML = morePanelBtn.innerHTML;
+
             sendButton.disabled = true;
-            uploadButton.disabled = true;
+            morePanelBtn.disabled = true;
             sendButton.innerHTML = '上传中...';
-            uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            morePanelBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中...';
 
             // 上传图片
             const uploadResponse = await fetch('/api/upload-image', {
@@ -762,13 +778,13 @@ class ChatApp {
             });
 
             const uploadResult = await uploadResponse.json();
-            
+
             // 恢复按钮状态
             sendButton.disabled = false;
-            uploadButton.disabled = false;
+            morePanelBtn.disabled = false;
             sendButton.innerHTML = originalSendText;
-            uploadButton.innerHTML = originalUploadText;
-            
+            morePanelBtn.innerHTML = '<i class="fas fa-image"></i> <span>发送图片</span>';
+
             if (uploadResult.ok) {
                 // 上传成功，发送图片消息
                 const imageMessage = `Pic_${uploadResult.image_id}`;
@@ -791,23 +807,45 @@ class ChatApp {
                     // 立即检查新消息以确保显示最新内容
                     setTimeout(() => this.checkForNewMessages(), 100);
                 } else {
-                    alert(result.msg || '发送图片消息失败');
+                    this.showErrorMessage(result.msg || '发送图片消息失败');
                 }
             } else {
-                alert(uploadResult.msg || '图片上传失败');
+                this.showErrorMessage(uploadResult.msg || '图片上传失败');
             }
         } catch (error) {
             console.error('上传图片出错:', error);
-            alert('图片上传失败: ' + error.message);
-            
+            this.showErrorMessage('图片上传失败: ' + error.message);
+
             // 恢复按钮状态
             const sendButton = document.getElementById('send-btn');
-            const uploadButton = document.getElementById('upload-btn');
+            const morePanelBtn = document.getElementById('upload-image-btn');
             sendButton.disabled = false;
-            uploadButton.disabled = false;
+            morePanelBtn.disabled = false;
             sendButton.innerHTML = '发送';
-            uploadButton.innerHTML = '<i class="fas fa-image"></i>';
+            morePanelBtn.innerHTML = '<i class="fas fa-image"></i> <span>发送图片</span>';
         }
+    }
+
+    // 显示错误消息
+    showErrorMessage(message) {
+        // 创建或更新错误消息元素
+        let errorMsg = document.getElementById('upload-error-message');
+        if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.id = 'upload-error-message';
+            errorMsg.className = 'feedback-message error';
+            // 将错误消息插入到输入框上方
+            const inputContainer = document.querySelector('.input-container');
+            inputContainer.parentNode.insertBefore(errorMsg, inputContainer);
+        }
+
+        errorMsg.textContent = message;
+        errorMsg.style.display = 'block';
+
+        // 3秒后自动隐藏错误消息
+        setTimeout(() => {
+            errorMsg.style.display = 'none';
+        }, 3000);
     }
 
     addMessageToUI(message, isOwnMessage = false) {
@@ -829,13 +867,13 @@ class ChatApp {
             } else {
                 messageElement.style.alignSelf = 'flex-start';
             }
-            
+
             // 为图片添加点击事件，打开图片查看器
             const img = messageElement.querySelector('img');
             img.addEventListener('click', () => {
                 this.openImageViewer(imageId, img);
             });
-            
+
             // 处理图片加载完成后的滚动
             img.onload = () => {
                 // 图片加载完成后重新滚动到底部
@@ -845,12 +883,12 @@ class ChatApp {
                 // 图片加载失败时也确保滚动到底部
                 this.scrollToBottom();
             };
-        } 
+        }
         // 检查是否是音乐消息
         else if (message.content.startsWith('Music_')) {
             // 提取音乐信息
             const musicInfo = JSON.parse(message.content.substring(6));
-            
+
             // 音乐消息使用特殊样式
             messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
             messageElement.innerHTML = `
@@ -881,18 +919,18 @@ class ChatApp {
                     </div>
                 </div>
             `;
-            
+
             // 添加播放按钮事件监听器
             const playBtn = messageElement.querySelector('.music-play-btn');
             const progressBar = messageElement.querySelector('.music-progress');
             const currentTimeEl = messageElement.querySelector('.music-current-time');
             const durationEl = messageElement.querySelector('.music-duration');
             const progressBarContainer = messageElement.querySelector('.music-progress-container');
-            
+
             playBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const musicId = playBtn.getAttribute('data-music-id');
-                
+
                 // 检查当前按钮状态
                 const icon = playBtn.querySelector('i');
                 if (icon.classList.contains('fa-play')) {
@@ -903,7 +941,7 @@ class ChatApp {
                     this.pauseMusic();
                 }
             });
-            
+
             // 添加歌词按钮事件监听器
             const lyricsBtn = messageElement.querySelector('.music-lyrics-btn');
             lyricsBtn.addEventListener('click', (e) => {
@@ -913,7 +951,7 @@ class ChatApp {
                 const musicArtist = lyricsBtn.getAttribute('data-music-artist');
                 this.showLyrics(musicId, musicTitle, musicArtist);
             });
-        } 
+        }
         else {
             // 文字消息使用气泡样式
             messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
@@ -923,7 +961,7 @@ class ChatApp {
         }
 
         container.appendChild(messageElement);
-        
+
         // 返回创建的元素，以便调用者可以进一步处理
         return messageElement;
     }
@@ -949,7 +987,7 @@ class ChatApp {
 
                 // 创建一个Promise数组来跟踪所有图片加载
                 const imagePromises = [];
-                
+
                 result.history.forEach((msg, index) => {
                     const message = {
                         sender: msg.sender,
@@ -957,31 +995,31 @@ class ChatApp {
                         timestamp: new Date(msg.timestamp)
                     };
                     const isOwnMessage = msg.sender === this.me;
-                    
+
                     // 判断是否显示时间戳
                     let showTime = true;
                     if (index > 0) {
                         const previousMsg = result.history[index - 1];
                         const previousTime = new Date(previousMsg.timestamp);
                         const currentTime = new Date(msg.timestamp);
-                        
+
                         // 计算时间差（毫秒）
                         const timeDiff = Math.abs(currentTime - previousTime);
-                        
+
                         // 如果时间差小于5分钟（300,000毫秒），不显示时间戳
                         if (timeDiff < 300000) {
                             showTime = false;
                         }
                     }
-                    
+
                     // 如果需要显示时间，则添加时间分隔符
                     if (showTime) {
                         this.addTimeDivider(message.timestamp);
                     }
-                    
+
                     // 添加消息到UI
                     const messageElement = this.addMessageToUI(message, isOwnMessage);
-                    
+
                     // 如果是图片消息，将图片加载Promise添加到数组中
                     if (message.content.startsWith('Pic_')) {
                         const img = messageElement.querySelector('img');
@@ -998,7 +1036,7 @@ class ChatApp {
                 });
 
                 this.lastMessageCount = result.history.length;
-                
+
                 // 等待所有图片加载完成后再滚动到底部
                 if (imagePromises.length > 0) {
                     Promise.all(imagePromises).then(() => {
@@ -1020,12 +1058,12 @@ class ChatApp {
         const container = document.getElementById('chat-messages');
         const dividerElement = document.createElement('div');
         dividerElement.className = 'time-divider';
-        
+
         const timeString = new Date(timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
         });
-        
+
         dividerElement.textContent = timeString;
         container.appendChild(dividerElement);
     }
@@ -1043,7 +1081,7 @@ class ChatApp {
                     friend: this.peer
                 })
             });
-            
+
             // 通知首页更新未读消息计数
             try {
                 localStorage.setItem('unread_updated', Date.now().toString());
@@ -1074,7 +1112,7 @@ class ChatApp {
 
                     // 只处理新增的消息，而不是清空整个容器
                     const startIndex = this.lastMessageCount;
-                    
+
                     for (let i = startIndex; i < result.history.length; i++) {
                         const msg = result.history[i];
                         const message = {
@@ -1083,34 +1121,34 @@ class ChatApp {
                             timestamp: new Date(msg.timestamp)
                         };
                         const isOwnMessage = msg.sender === this.me;
-                        
+
                         // 判断是否显示时间戳
                         let showTime = true;
                         if (i > 0) {
                             const previousMsg = result.history[i - 1];
                             const previousTime = new Date(previousMsg.timestamp);
                             const currentTime = new Date(msg.timestamp);
-                            
+
                             // 计算时间差（毫秒）
                             const timeDiff = Math.abs(currentTime - previousTime);
-                            
+
                             // 如果时间差小于5分钟（300,000毫秒），不显示时间戳
                             if (timeDiff < 300000) {
                                 showTime = false;
                             }
                         }
-                        
+
                         // 如果需要显示时间，则添加时间分隔符
                         if (showTime) {
                             this.addTimeDivider(message.timestamp);
                         }
-                        
+
                         // 添加消息到UI
                         this.addMessageToUI(message, isOwnMessage);
                     }
 
                     this.lastMessageCount = result.history.length;
-                    
+
                     // 如果不是自己发送的消息，则显示新消息提示
                     const lastMessage = result.history[result.history.length - 1];
                     if (lastMessage.sender !== this.me) {
@@ -1130,7 +1168,7 @@ class ChatApp {
             this.hasNewMessage = true;
             // 更新页面标题显示新消息提示
             document.title = `(${newMessageCount}) ${this.originalTitle}`;
-            
+
             // 尝试使用浏览器通知（如果支持且已授权）
             this.showNotification(newMessageCount);
         }
@@ -1272,7 +1310,7 @@ let chatApp = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     chatApp = new ChatApp();
-    
+
     // 监听返回按钮点击事件
     const backBtn = document.querySelector('.back-btn');
     if (backBtn) {
@@ -1282,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // 添加聊天设置相关事件监听
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
     const chatSettingsModal = document.getElementById('chat-settings-modal');
