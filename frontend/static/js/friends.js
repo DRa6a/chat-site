@@ -835,6 +835,7 @@ class ChatApp {
                                 <i class="fas fa-align-left"></i>
                             </button>
                         </div>
+                        <div class="music-source">音乐来源：网易云音乐</div>
                         <audio class="music-audio" style="display: none;"></audio>
                     </div>
                 </div>

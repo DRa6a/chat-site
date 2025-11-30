@@ -1334,6 +1334,13 @@ input.glass::placeholder {
     flex-shrink: 0;
 }
 
+.music-source {
+    font-size: 0.7em;
+    opacity: 0.6;
+    margin-top: 4px;
+    text-align: right;
+}
+
 /* 音频元素 */
 .music-audio {
     display: none;
