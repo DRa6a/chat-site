@@ -447,6 +447,10 @@ input.glass::placeholder {
     flex: 1;
 }
 
+.input-group .fas {
+    pointer-events: none;
+}
+
 .btn-small {
     padding: 8px 12px;
     font-size: 14px;
@@ -772,6 +776,18 @@ input.glass::placeholder {
     border-bottom-left-radius: 5px;
 }
 
+.message-bubble img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    outline: none;
+}
+
+.message-image {
+    margin: 5px 0;
+}
+
 .message-sender {
     font-weight: bold;
     font-size: 0.85rem;
@@ -860,6 +876,10 @@ input.glass::placeholder {
 .send-btn:hover {
     -webkit-transform: scale(1.05);
     transform: scale(1.05);
+}
+
+.input-container .fas {
+    pointer-events: none;
 }
 
 /* 响应式设计 */

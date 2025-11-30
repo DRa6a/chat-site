@@ -32,6 +32,16 @@ class ChatApp {
             this.sendMessage();
         });
 
+        // 图片上传按钮事件
+        document.getElementById('upload-btn').addEventListener('click', () => {
+            document.getElementById('image-upload').click();
+        });
+
+        // 图片选择事件
+        document.getElementById('image-upload').addEventListener('change', (e) => {
+            this.uploadImage(e.target.files[0]);
+        });
+
         // 回车发送消息
         document.getElementById('message-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -101,14 +111,111 @@ class ChatApp {
         }
     }
 
+    async uploadImage(imageFile) {
+        if (!imageFile) return;
+
+        // 创建FormData对象用于上传文件
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        try {
+            // 显示上传中提示
+            const sendButton = document.getElementById('send-btn');
+            const uploadButton = document.getElementById('upload-btn');
+            const originalSendText = sendButton.innerHTML;
+            const originalUploadText = uploadButton.innerHTML;
+            
+            sendButton.disabled = true;
+            uploadButton.disabled = true;
+            sendButton.innerHTML = '上传中...';
+            uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            // 上传图片
+            const uploadResponse = await fetch('/api/upload-image', {
+                method: 'POST',
+                headers: {
+                    'X-User': this.me
+                },
+                body: formData
+            });
+
+            const uploadResult = await uploadResponse.json();
+            
+            // 恢复按钮状态
+            sendButton.disabled = false;
+            uploadButton.disabled = false;
+            sendButton.innerHTML = originalSendText;
+            uploadButton.innerHTML = originalUploadText;
+            
+            if (uploadResult.ok) {
+                // 上传成功，发送图片消息
+                const imageMessage = `Pic_${uploadResult.image_id}`;
+                const response = await fetch('/api/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User': this.me
+                    },
+                    body: JSON.stringify({
+                        recipient: this.peer,
+                        content: imageMessage
+                    })
+                });
+
+                const result = await response.json();
+                if (result.ok) {
+                    // 清空文件选择
+                    document.getElementById('image-upload').value = '';
+                    this.scrollToBottom();
+                    
+                    // 立即检查新消息以确保显示最新内容
+                    setTimeout(() => this.checkForNewMessages(), 100);
+                } else {
+                    alert(result.msg || '发送图片消息失败');
+                }
+            } else {
+                alert(uploadResult.msg || '图片上传失败');
+            }
+        } catch (error) {
+            console.error('上传图片出错:', error);
+            alert('图片上传失败: ' + error.message);
+            
+            // 恢复按钮状态
+            const sendButton = document.getElementById('send-btn');
+            const uploadButton = document.getElementById('upload-btn');
+            sendButton.disabled = false;
+            uploadButton.disabled = false;
+            sendButton.innerHTML = '发送';
+            uploadButton.innerHTML = '<i class="fas fa-image"></i>';
+        }
+    }
+
     addMessageToUI(message, isOwnMessage = false) {
         const container = document.getElementById('chat-messages');
         const messageElement = document.createElement('div');
-        messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
 
-        messageElement.innerHTML = `
-            <div class="message-content">${this.escapeHtml(message.content)}</div>
-        `;
+        // 检查是否是图片消息
+        if (message.content.startsWith('Pic_')) {
+            // 提取图片ID
+            const imageId = message.content.substring(4);
+            // 图片消息不使用气泡样式，直接显示图片
+            messageElement.className = 'message-image';
+            messageElement.innerHTML = `
+                <img src="/api/get-image/${imageId}" alt="图片" style="max-width: 200px; max-height: 200px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+            `;
+            // 根据发送者设置对齐方式
+            if (isOwnMessage) {
+                messageElement.style.alignSelf = 'flex-end';
+            } else {
+                messageElement.style.alignSelf = 'flex-start';
+            }
+        } else {
+            // 文字消息使用气泡样式
+            messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
+            messageElement.innerHTML = `
+                <div class="message-content">${this.escapeHtml(message.content)}</div>
+            `;
+        }
 
         container.appendChild(messageElement);
         

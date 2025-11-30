@@ -1,11 +1,12 @@
 import sqlite3
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import json, pathlib, os
 from datetime import datetime
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import threading
 import time
+import uuid
 
 app = Flask(__name__,
             template_folder='../frontend',
@@ -66,7 +67,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 USER_FILE = ROOT / 'data' / 'users.json'
 FRIENDS_DIR = ROOT / 'data' / 'users'
 DB_FILE = ROOT / 'data' / 'chat.db'
+UPLOAD_FOLDER = ROOT / 'uploads'
 os.makedirs(FRIENDS_DIR, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # 在每个路由后记录统计信息
 @app.after_request
@@ -112,6 +115,17 @@ def init_db():
         )
     ''')
     
+    # 创建图片表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            uploader TEXT NOT NULL,
+            upload_time TEXT NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -140,9 +154,10 @@ def load_chat_history(user1, user2):
         messages = []
         for row in cursor.fetchall():
             content = row[2]
-            # 去掉消息内容的Chat_前缀（只去掉一个）
+            # 处理不同类型的消息前缀
             if content.startswith("Chat_"):
                 content = content[5:]  # 去掉"Chat_"前缀
+            # Pic_前缀保留，供前端识别处理
                 
             messages.append({
                 "id": row[0],
@@ -159,13 +174,16 @@ def load_chat_history(user1, user2):
 
 def save_chat_message(user1, user2, sender, content):
     """保存聊天消息"""
-    # 保存到数据库，添加Chat_前缀
+    # 保存到数据库，添加消息类型前缀
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        # 添加Chat_前缀到消息内容
-        prefixed_content = "Chat_" + content
+        # 检查是否是图片消息 (Pic_前缀)
+        if content.startswith("Pic_"):
+            prefixed_content = content  # 已经带有前缀
+        else:
+            prefixed_content = "Chat_" + content  # 文字消息添加Chat_前缀
         
         cursor.execute('''
             INSERT INTO messages (sender, recipient, content, timestamp)
@@ -178,10 +196,19 @@ def save_chat_message(user1, user2, sender, content):
         
         # 通过WebSocket通知相关用户有新消息
         room = "_".join(sorted([user1, user2]))
+        # 去掉前缀发送实际内容
+        display_content = content
+        if content.startswith("Pic_"):
+            # 图片消息保留Pic_前缀以便前端识别
+            pass
+        elif content.startswith("Chat_"):
+            # 文字消息去掉Chat_前缀
+            display_content = content[5:]
+        
         socketio.emit('new_message', {
             'sender': sender,
             'recipient': user2,
-            'content': content,  # 发送时不带前缀
+            'content': display_content,
             'timestamp': datetime.now().isoformat()
         }, room=room)
         
@@ -411,6 +438,40 @@ def api_clear_chat_history():
             WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
         ''', (current_user, friend_name, friend_name, current_user))
         
+        # 删除与这些消息相关的已读标记
+        cursor.execute('''
+            DELETE FROM read_messages 
+            WHERE message_id NOT IN (SELECT id FROM messages)
+        ''')
+        
+        # 查找并删除与这些消息相关的图片记录和文件
+        cursor.execute('''
+            SELECT id, filename FROM images 
+            WHERE id IN (
+                SELECT CAST(SUBSTR(content, 5) AS INTEGER) 
+                FROM messages 
+                WHERE content LIKE 'Pic_%'
+            )
+        ''')
+        
+        image_records = cursor.fetchall()
+        
+        # 删除图片文件
+        for image_id, filename in image_records:
+            file_path = UPLOAD_FOLDER / filename
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        # 删除图片记录
+        cursor.execute('''
+            DELETE FROM images 
+            WHERE id IN (
+                SELECT CAST(SUBSTR(content, 5) AS INTEGER) 
+                FROM messages 
+                WHERE content LIKE 'Pic_%'
+            )
+        ''')
+        
         conn.commit()
         conn.close()
         
@@ -512,6 +573,80 @@ def api_mark_messages_as_read():
     except Exception as e:
         print(f"标记消息为已读时出错: {e}")
         return jsonify({'ok': False, 'msg': '标记消息为已读失败'}), 500
+
+@app.route('/api/upload-image', methods=['POST'])
+def upload_image():
+    """上传图片API"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    if 'image' not in request.files:
+        return jsonify({'ok': False, 'msg': '没有上传文件'}), 400
+    
+    image_file = request.files['image']
+    if image_file.filename == '':
+        return jsonify({'ok': False, 'msg': '文件名为空'}), 400
+    
+    if image_file:
+        try:
+            # 生成唯一文件名
+            ext = os.path.splitext(image_file.filename)[1]
+            if not ext:
+                ext = '.png'  # 默认扩展名
+            unique_filename = str(uuid.uuid4()) + ext
+            file_path = UPLOAD_FOLDER / unique_filename
+            
+            # 保存文件
+            image_file.save(file_path)
+            
+            # 保存图片信息到数据库
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO images (filename, original_name, uploader, upload_time)
+                VALUES (?, ?, ?, ?)
+            ''', (unique_filename, image_file.filename, current_user, datetime.now().isoformat()))
+            
+            image_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'ok': True, 'image_id': image_id, 'msg': '图片上传成功'})
+        except Exception as e:
+            # 如果保存数据库失败，删除已上传的文件
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+            print(f"保存图片信息到数据库时出错: {e}")
+            return jsonify({'ok': False, 'msg': f'上传失败: {str(e)}'}), 500
+    
+    return jsonify({'ok': False, 'msg': '上传失败'}), 500
+
+@app.route('/api/get-image/<int:image_id>')
+def get_image(image_id):
+    """获取图片"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT filename FROM images WHERE id = ?', (image_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            filename = result[0]
+            file_path = UPLOAD_FOLDER / filename
+            if os.path.exists(file_path):
+                return send_from_directory(UPLOAD_FOLDER, filename)
+        
+        return jsonify({'ok': False, 'msg': '图片不存在'}), 404
+    except Exception as e:
+        print(f"获取图片时出错: {e}")
+        return jsonify({'ok': False, 'msg': '获取图片失败'}), 500
 
 @app.route('/flowStatistics')
 def flow_statistics():
