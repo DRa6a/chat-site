@@ -69,12 +69,49 @@
         <div class="input-container glass">
             <input type="text" id="message-input" placeholder="输入消息..." class="glass" />
             <button id="send-btn" class="glass send-btn">发送</button>
-            <button id="upload-btn" class="glass send-btn">
-                <i class="fas fa-image"></i>
+            <button id="more-btn" class="glass send-btn">
+                <i class="fas fa-plus"></i>
             </button>
-            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        </div>
+        
+        <!-- 更多功能面板 -->
+        <div id="more-panel" class="more-panel glass">
+            <div class="more-panel-content">
+                <button id="upload-image-btn" class="more-panel-btn">
+                    <i class="fas fa-image"></i>
+                    <span>发送图片</span>
+                </button>
+                <button id="search-music-btn" class="more-panel-btn">
+                    <i class="fas fa-music"></i>
+                    <span>分享音乐</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 音乐搜索模态框 -->
+        <div id="music-search-modal" class="modal">
+            <div class="modal-content glass music-search-modal">
+                <div class="modal-header">
+                    <h2>搜索音乐</h2>
+                    <span class="close-btn" id="close-music-search">&times;</span>
+                </div>
+                <div class="music-search-form">
+                    <div class="input-group">
+                        <input type="text" id="music-search-input" placeholder="输入歌曲名或歌手名..." class="glass">
+                        <button id="music-search-btn" class="glass send-btn">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+                <div id="music-search-results" class="music-search-results">
+                    <!-- 搜索结果将在这里显示 -->
+                </div>
+            </div>
         </div>
     </main>
+
+    <!-- 文件上传隐藏输入框 -->
+    <input type="file" id="image-upload" accept="image/*" style="display: none;">
 
     <!-- 聊天设置模态框 -->
     <div id="chat-settings-modal" class="modal">

@@ -7,6 +7,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import threading
 import time
 import uuid
+import requests
 
 app = Flask(__name__,
             template_folder='../frontend',
@@ -646,6 +647,153 @@ def get_image(image_id):
     except Exception as e:
         print(f"获取图片时出错: {e}")
         return jsonify({'ok': False, 'msg': '获取图片失败'}), 500
+
+@app.route('/api/music/search')
+def music_search():
+    """搜索音乐"""
+    keyword = request.args.get('keyword', '')
+    limit = request.args.get('limit', '30')
+    
+    if not keyword:
+        return jsonify({'ok': False, 'msg': '搜索关键词不能为空'}), 400
+    
+    try:
+        # 使用网易云音乐API搜索音乐
+        url = 'https://music.163.com/api/cloudsearch/pc'
+        params = {
+            's': keyword,
+            'type': '1',  # 1: 单曲
+            'limit': limit,
+            'offset': '0'
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://music.163.com'
+        }
+        
+        response = requests.post(url, data=params, headers=headers)
+        data = response.json()
+        
+        if data.get('code') == 200:
+            songs = []
+            for song in data.get('result', {}).get('songs', []):
+                # 处理歌手信息
+                artists = []
+                for artist in song.get('ar', []):
+                    artists.append(artist.get('name', ''))
+                
+                songs.append({
+                    'id': song.get('id'),
+                    'name': song.get('name'),
+                    'artists': artists,
+                    'album': song.get('al', {}).get('name', ''),
+                    'picUrl': song.get('al', {}).get('picUrl', '')
+                })
+            
+            return jsonify({'ok': True, 'songs': songs})
+        else:
+            return jsonify({'ok': False, 'msg': '搜索失败'}), 500
+    except Exception as e:
+        print(f"音乐搜索出错: {e}")
+        return jsonify({'ok': False, 'msg': f'搜索出错: {str(e)}'}), 500
+
+@app.route('/api/music/detail')
+def music_detail():
+    """获取音乐详情"""
+    music_id = request.args.get('id', '')
+    
+    if not music_id:
+        return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
+    
+    try:
+        # 使用网易云音乐API获取音乐详情
+        url = f'https://music.163.com/api/song/detail'
+        params = {
+            'ids': f'[{music_id}]'
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://music.163.com'
+        }
+        
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+        
+        if data.get('code') == 200 and data.get('songs'):
+            song = data['songs'][0]
+            # 处理歌手信息
+            artists = []
+            for artist in song.get('artists', []):
+                artists.append(artist.get('name', ''))
+            
+            music_info = {
+                'id': song.get('id'),
+                'name': song.get('name'),
+                'artists': artists,
+                'album': song.get('album', {}).get('name', ''),
+                'picUrl': song.get('album', {}).get('picUrl', ''),
+                'duration': song.get('duration', 0)
+            }
+            
+            return jsonify({'ok': True, 'music': music_info})
+        else:
+            return jsonify({'ok': False, 'msg': '获取音乐详情失败'}), 500
+    except Exception as e:
+        print(f"获取音乐详情出错: {e}")
+        return jsonify({'ok': False, 'msg': f'获取详情出错: {str(e)}'}), 500
+
+@app.route('/api/music/url')
+def music_url():
+    """获取音乐播放链接"""
+    music_id = request.args.get('id', '')
+    
+    if not music_id:
+        return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
+    
+    try:
+        # 使用网易云音乐API获取音乐播放链接
+        url = f'https://music.163.com/song/media/outer/url?id={music_id}.mp3'
+        return jsonify({'ok': True, 'url': url})
+    except Exception as e:
+        print(f"获取音乐播放链接出错: {e}")
+        return jsonify({'ok': False, 'msg': f'获取播放链接出错: {str(e)}'}), 500
+
+@app.route('/api/music/lyric')
+def music_lyric():
+    """获取音乐歌词"""
+    music_id = request.args.get('id', '')
+    
+    if not music_id:
+        return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
+    
+    try:
+        # 使用网易云音乐API获取歌词
+        url = f'https://music.163.com/api/song/lyric'
+        params = {
+            'id': music_id,
+            'lv': -1,
+            'kv': -1,
+            'tv': -1
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://music.163.com'
+        }
+        
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+        
+        if data.get('code') == 200:
+            lyric = data.get('lrc', {}).get('lyric', '')
+            return jsonify({'ok': True, 'lyric': lyric})
+        else:
+            return jsonify({'ok': False, 'msg': '获取歌词失败'}), 500
+    except Exception as e:
+        print(f"获取歌词出错: {e}")
+        return jsonify({'ok': False, 'msg': f'获取歌词出错: {str(e)}'}), 500
 
 @app.route('/flowStatistics')
 def flow_statistics():

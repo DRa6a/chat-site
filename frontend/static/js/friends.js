@@ -18,6 +18,11 @@ class ChatApp {
         this.imageMessages = []; // 存储所有图片消息
         this.currentImageIndex = 0; // 当前查看的图片索引
         
+        // 音乐播放相关属性
+        this.currentAudio = null;
+        this.currentPlayingButton = null;
+        this.currentProgressInterval = null;
+        
         this.init();
     }
 
@@ -32,6 +37,9 @@ class ChatApp {
         
         // 创建图片查看器
         this.createImageViewer();
+        
+        // 创建歌词查看器
+        this.createLyricsViewer();
     }
 
     setupEventListeners() {
@@ -40,9 +48,21 @@ class ChatApp {
             this.sendMessage();
         });
 
+        // 更多按钮事件
+        document.getElementById('more-btn').addEventListener('click', () => {
+            this.toggleMorePanel();
+        });
+
         // 图片上传按钮事件
-        document.getElementById('upload-btn').addEventListener('click', () => {
+        document.getElementById('upload-image-btn').addEventListener('click', () => {
             document.getElementById('image-upload').click();
+            this.hideMorePanel();
+        });
+
+        // 音乐搜索按钮事件
+        document.getElementById('search-music-btn').addEventListener('click', () => {
+            this.showMusicSearchModal();
+            this.hideMorePanel();
         });
 
         // 图片选择事件
@@ -73,8 +93,168 @@ class ChatApp {
             this.clearNewMessageIndicator();
         });
         
+        // 点击页面其他地方隐藏更多功能面板
+        document.addEventListener('click', (e) => {
+            const morePanel = document.getElementById('more-panel');
+            const moreBtn = document.getElementById('more-btn');
+            
+            if (morePanel.style.display === 'block' && 
+                !morePanel.contains(e.target) && 
+                e.target !== moreBtn) {
+                this.hideMorePanel();
+            }
+        });
+        
+        // 音乐搜索相关事件
+        document.getElementById('music-search-btn').addEventListener('click', () => {
+            this.searchMusic();
+        });
+        
+        document.getElementById('music-search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.searchMusic();
+            }
+        });
+        
+        document.getElementById('close-music-search').addEventListener('click', () => {
+            this.closeMusicSearchModal();
+        });
+        
         // 图片查看器事件监听器 (推迟到图片查看器创建后再设置)
         // 这些监听器将在 createImageViewer 方法中设置
+    }
+    
+    // 切换更多功能面板显示/隐藏
+    toggleMorePanel() {
+        const morePanel = document.getElementById('more-panel');
+        if (morePanel.style.display === 'block') {
+            this.hideMorePanel();
+        } else {
+            this.showMorePanel();
+        }
+    }
+    
+    // 显示更多功能面板
+    showMorePanel() {
+        const morePanel = document.getElementById('more-panel');
+        morePanel.style.display = 'block';
+    }
+    
+    // 隐藏更多功能面板
+    hideMorePanel() {
+        const morePanel = document.getElementById('more-panel');
+        morePanel.style.display = 'none';
+    }
+    
+    // 显示音乐搜索模态框
+    showMusicSearchModal() {
+        const modal = document.getElementById('music-search-modal');
+        modal.style.display = 'block';
+        document.getElementById('music-search-input').focus();
+    }
+    
+    // 关闭音乐搜索模态框
+    closeMusicSearchModal() {
+        const modal = document.getElementById('music-search-modal');
+        modal.style.display = 'none';
+        document.getElementById('music-search-input').value = '';
+        document.getElementById('music-search-results').innerHTML = '';
+    }
+    
+    // 搜索音乐
+    async searchMusic() {
+        const keyword = document.getElementById('music-search-input').value.trim();
+        if (!keyword) {
+            alert('请输入搜索关键词');
+            return;
+        }
+        
+        try {
+            const searchBtn = document.getElementById('music-search-btn');
+            const originalHTML = searchBtn.innerHTML;
+            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 搜索';
+            searchBtn.disabled = true;
+            
+            const response = await fetch(`/api/music/search?keyword=${encodeURIComponent(keyword)}`);
+            const result = await response.json();
+            
+            searchBtn.innerHTML = originalHTML;
+            searchBtn.disabled = false;
+            
+            if (result.ok) {
+                this.displayMusicSearchResults(result.songs);
+            } else {
+                alert(result.msg || '搜索失败');
+            }
+        } catch (error) {
+            console.error('搜索音乐出错:', error);
+            document.getElementById('music-search-btn').innerHTML = '<i class="fas fa-search"></i> 搜索';
+            document.getElementById('music-search-btn').disabled = false;
+            alert('搜索出错: ' + error.message);
+        }
+    }
+    
+    // 显示音乐搜索结果
+    displayMusicSearchResults(songs) {
+        const resultsContainer = document.getElementById('music-search-results');
+        resultsContainer.innerHTML = '';
+        
+        if (songs.length === 0) {
+            resultsContainer.innerHTML = '<p style="text-align: center; padding: 20px;">没有找到相关音乐</p>';
+            return;
+        }
+        
+        songs.forEach(song => {
+            const item = document.createElement('div');
+            item.className = 'music-result-item';
+            item.innerHTML = `
+                <img src="${song.picUrl || '/static/images/music-placeholder.png'}" 
+                     alt="${song.name}" 
+                     class="music-result-cover"
+                     onerror="this.src='/static/images/music-placeholder.png'">
+                <div class="music-result-info">
+                    <div class="music-result-name">${this.escapeHtml(song.name)}</div>
+                    <div class="music-result-artists">${this.escapeHtml(song.artists.join(', '))}</div>
+                </div>
+            `;
+            
+            item.addEventListener('click', () => {
+                this.sendMusicMessage(song);
+            });
+            
+            resultsContainer.appendChild(item);
+        });
+    }
+    
+    // 发送音乐消息
+    async sendMusicMessage(musicInfo) {
+        try {
+            const musicMessage = `Music_${JSON.stringify(musicInfo)}`;
+            
+            const response = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': this.me
+                },
+                body: JSON.stringify({
+                    recipient: this.peer,
+                    content: musicMessage
+                })
+            });
+
+            const result = await response.json();
+            if (result.ok) {
+                this.closeMusicSearchModal();
+                // 立即检查新消息以确保显示最新内容
+                setTimeout(() => this.checkForNewMessages(), 100);
+            } else {
+                alert(result.msg || '发送音乐消息失败');
+            }
+        } catch (error) {
+            console.error('发送音乐消息出错:', error);
+            alert('发送音乐消息失败: ' + error.message);
+        }
     }
     
     // 创建图片查看器
@@ -178,6 +358,189 @@ class ChatApp {
                 }
             }
         });
+    }
+    
+    // 创建歌词查看器
+    createLyricsViewer() {
+        const lyricsModal = document.createElement('div');
+        lyricsModal.id = 'lyrics-modal';
+        lyricsModal.className = 'lyrics-modal';
+        lyricsModal.innerHTML = `
+            <div class="lyrics-content">
+                <span class="lyrics-close">&times;</span>
+                <div class="lyrics-title"></div>
+                <div class="lyrics-artist"></div>
+                <div class="lyrics-text">加载中...</div>
+            </div>
+        `;
+        
+        document.body.appendChild(lyricsModal);
+        
+        // 设置事件监听器
+        const closeBtn = lyricsModal.querySelector('.lyrics-close');
+        closeBtn.addEventListener('click', () => {
+            this.closeLyricsViewer();
+        });
+        
+        lyricsModal.addEventListener('click', (event) => {
+            if (event.target === lyricsModal) {
+                this.closeLyricsViewer();
+            }
+        });
+    }
+    
+    // 显示歌词
+    async showLyrics(musicId, musicTitle, musicArtist) {
+        const lyricsModal = document.getElementById('lyrics-modal');
+        const titleEl = lyricsModal.querySelector('.lyrics-title');
+        const artistEl = lyricsModal.querySelector('.lyrics-artist');
+        const textEl = lyricsModal.querySelector('.lyrics-text');
+        
+        titleEl.textContent = musicTitle;
+        artistEl.textContent = musicArtist;
+        textEl.textContent = '加载中...';
+        
+        lyricsModal.style.display = 'block';
+        
+        try {
+            const response = await fetch(`/api/music/lyric?id=${musicId}`);
+            const result = await response.json();
+            
+            if (result.ok) {
+                textEl.textContent = result.lyric || '暂无歌词';
+            } else {
+                textEl.textContent = '加载歌词失败';
+            }
+        } catch (error) {
+            console.error('获取歌词出错:', error);
+            textEl.textContent = '加载歌词出错';
+        }
+    }
+    
+    // 关闭歌词查看器
+    closeLyricsViewer() {
+        const lyricsModal = document.getElementById('lyrics-modal');
+        lyricsModal.style.display = 'none';
+    }
+    
+    // 更新进度条
+    updateProgress(audioElement, progressBar, currentTimeEl, durationEl) {
+        if (!audioElement || !progressBar) return;
+        
+        const currentTime = audioElement.currentTime;
+        const duration = audioElement.duration || 0;
+        
+        // 更新进度条
+        if (duration > 0) {
+            const progressPercent = (currentTime / duration) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+        }
+        
+        // 更新时间显示
+        if (currentTimeEl) {
+            currentTimeEl.textContent = this.formatTime(currentTime);
+        }
+        
+        if (durationEl && duration > 0) {
+            durationEl.textContent = this.formatTime(duration);
+        }
+    }
+    
+    // 格式化时间 (秒 -> mm:ss)
+    formatTime(seconds) {
+        if (isNaN(seconds)) return '00:00';
+        
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // 播放音乐
+    async playMusic(musicId, playButton, progressBar, currentTimeEl, durationEl) {
+        try {
+            // 如果正在播放其他音乐，先停止
+            if (this.currentAudio) {
+                this.currentAudio.pause();
+                if (this.currentPlayingButton) {
+                    this.currentPlayingButton.innerHTML = '<i class="fas fa-play"></i>';
+                }
+                // 清除之前的进度更新定时器
+                if (this.currentProgressInterval) {
+                    clearInterval(this.currentProgressInterval);
+                    this.currentProgressInterval = null;
+                }
+            }
+            
+            // 获取音乐播放链接
+            const response = await fetch(`/api/music/url?id=${musicId}`);
+            const result = await response.json();
+            
+            if (result.ok) {
+                // 创建或更新audio元素
+                if (!this.currentAudio) {
+                    this.currentAudio = new Audio();
+                }
+                
+                this.currentAudio.src = result.url;
+                this.currentAudio.play();
+                
+                // 更新按钮状态
+                playButton.innerHTML = '<i class="fas fa-pause"></i>';
+                this.currentPlayingButton = playButton;
+                
+                // 开始定期更新进度条
+                this.currentProgressInterval = setInterval(() => {
+                    this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
+                }, 1000);
+                
+                // 监听播放结束事件
+                this.currentAudio.onended = () => {
+                    playButton.innerHTML = '<i class="fas fa-play"></i>';
+                    this.currentPlayingButton = null;
+                    if (this.currentProgressInterval) {
+                        clearInterval(this.currentProgressInterval);
+                        this.currentProgressInterval = null;
+                    }
+                    // 重置进度条
+                    if (progressBar) {
+                        progressBar.style.width = '0%';
+                    }
+                    if (currentTimeEl) {
+                        currentTimeEl.textContent = '00:00';
+                    }
+                    if (durationEl) {
+                        durationEl.textContent = '00:00';
+                    }
+                    this.currentAudio = null;
+                };
+                
+                // 监听元数据加载完成事件以获取时长
+                this.currentAudio.onloadedmetadata = () => {
+                    this.updateProgress(this.currentAudio, progressBar, currentTimeEl, durationEl);
+                };
+            } else {
+                alert(result.msg || '获取音乐播放链接失败');
+            }
+        } catch (error) {
+            console.error('播放音乐出错:', error);
+            alert('播放音乐失败: ' + error.message);
+        }
+    }
+    
+    // 暂停音乐
+    pauseMusic() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            if (this.currentPlayingButton) {
+                this.currentPlayingButton.innerHTML = '<i class="fas fa-play"></i>';
+            }
+            if (this.currentProgressInterval) {
+                clearInterval(this.currentProgressInterval);
+                this.currentProgressInterval = null;
+            }
+            this.currentPlayingButton = null;
+            this.currentAudio = null;
+        }
     }
     
     // 打开图片查看器
@@ -441,7 +804,74 @@ class ChatApp {
                 // 图片加载失败时也确保滚动到底部
                 this.scrollToBottom();
             };
-        } else {
+        } 
+        // 检查是否是音乐消息
+        else if (message.content.startsWith('Music_')) {
+            // 提取音乐信息
+            const musicInfo = JSON.parse(message.content.substring(6));
+            
+            // 音乐消息使用特殊样式
+            messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
+            messageElement.innerHTML = `
+                <div class="music-message">
+                    <div class="music-cover">
+                        <img src="${musicInfo.picUrl || '/static/images/music-placeholder.png'}" alt="专辑封面" onerror="this.src='/static/images/music-placeholder.png'">
+                    </div>
+                    <div class="music-info">
+                        <div class="music-title">${this.escapeHtml(musicInfo.name)}</div>
+                        <div class="music-artist">${this.escapeHtml(musicInfo.artists.join(', '))}</div>
+                        <div class="music-controls">
+                            <button class="music-play-btn" data-music-id="${musicInfo.id}">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <div class="music-progress-container">
+                                <span class="music-current-time">00:00</span>
+                                <div class="music-progress-bar">
+                                    <div class="music-progress" style="width: 0%"></div>
+                                </div>
+                                <span class="music-duration">00:00</span>
+                            </div>
+                            <button class="music-lyrics-btn" data-music-id="${musicInfo.id}" data-music-title="${this.escapeHtml(musicInfo.name)}" data-music-artist="${this.escapeHtml(musicInfo.artists.join(', '))}">
+                                <i class="fas fa-align-left"></i>
+                            </button>
+                        </div>
+                        <audio class="music-audio" style="display: none;"></audio>
+                    </div>
+                </div>
+            `;
+            
+            // 添加播放按钮事件监听器
+            const playBtn = messageElement.querySelector('.music-play-btn');
+            const progressBar = messageElement.querySelector('.music-progress');
+            const currentTimeEl = messageElement.querySelector('.music-current-time');
+            const durationEl = messageElement.querySelector('.music-duration');
+            
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const musicId = playBtn.getAttribute('data-music-id');
+                
+                // 检查当前按钮状态
+                const icon = playBtn.querySelector('i');
+                if (icon.classList.contains('fa-play')) {
+                    // 播放音乐
+                    this.playMusic(musicId, playBtn, progressBar, currentTimeEl, durationEl);
+                } else {
+                    // 暂停音乐
+                    this.pauseMusic();
+                }
+            });
+            
+            // 添加歌词按钮事件监听器
+            const lyricsBtn = messageElement.querySelector('.music-lyrics-btn');
+            lyricsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const musicId = lyricsBtn.getAttribute('data-music-id');
+                const musicTitle = lyricsBtn.getAttribute('data-music-title');
+                const musicArtist = lyricsBtn.getAttribute('data-music-artist');
+                this.showLyrics(musicId, musicTitle, musicArtist);
+            });
+        } 
+        else {
             // 文字消息使用气泡样式
             messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
             messageElement.innerHTML = `
@@ -787,6 +1217,10 @@ class ChatApp {
         this.markMessagesAsRead();
         // 关闭图片查看器
         this.closeImageViewer();
+        // 关闭歌词查看器
+        this.closeLyricsViewer();
+        // 暂停音乐播放
+        this.pauseMusic();
     }
 }
 
