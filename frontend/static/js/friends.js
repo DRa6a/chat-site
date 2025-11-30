@@ -209,6 +209,17 @@ class ChatApp {
             } else {
                 messageElement.style.alignSelf = 'flex-start';
             }
+            
+            // 处理图片加载完成后的滚动
+            const img = messageElement.querySelector('img');
+            img.onload = () => {
+                // 图片加载完成后重新滚动到底部
+                this.scrollToBottom();
+            };
+            img.onerror = () => {
+                // 图片加载失败时也确保滚动到底部
+                this.scrollToBottom();
+            };
         } else {
             // 文字消息使用气泡样式
             messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
@@ -219,8 +230,11 @@ class ChatApp {
 
         container.appendChild(messageElement);
         
-        // 确保消息容器滚动到底部
-        container.scrollTop = container.scrollHeight;
+        // 确保消息容器滚动到底部（对于文本消息立即执行，图片消息会在图片加载完成后执行）
+        this.scrollToBottom();
+        
+        // 返回创建的元素，以便调用者可以进一步处理
+        return messageElement;
     }
 
     escapeHtml(text) {
@@ -343,6 +357,9 @@ class ChatApp {
 
                     // 只处理新增的消息，而不是清空整个容器
                     const startIndex = this.lastMessageCount;
+                    // 创建一个Promise数组来跟踪所有图片加载
+                    const imagePromises = [];
+                    
                     for (let i = startIndex; i < result.history.length; i++) {
                         const msg = result.history[i];
                         const message = {
@@ -373,11 +390,30 @@ class ChatApp {
                             this.addTimeDivider(message.timestamp);
                         }
                         
-                        this.addMessageToUI(message, isOwnMessage);
+                        // 添加消息到UI
+                        const messageElement = this.addMessageToUI(message, isOwnMessage);
+                        
+                        // 如果是图片消息，将图片加载Promise添加到数组中
+                        if (message.content.startsWith('Pic_')) {
+                            const img = messageElement.querySelector('img');
+                            const imgPromise = new Promise((resolve) => {
+                                img.onload = () => resolve();
+                                img.onerror = () => resolve(); // 即使加载失败也继续
+                            });
+                            imagePromises.push(imgPromise);
+                        }
                     }
 
                     this.lastMessageCount = result.history.length;
-                    this.scrollToBottom();
+                    
+                    // 等待所有图片加载完成后再滚动到底部
+                    if (imagePromises.length > 0) {
+                        Promise.all(imagePromises).then(() => {
+                            this.scrollToBottom();
+                        });
+                    } else {
+                        this.scrollToBottom();
+                    }
                     
                     // 如果不是自己发送的消息，则显示新消息提示
                     const lastMessage = result.history[result.history.length - 1];
