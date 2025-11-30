@@ -432,6 +432,26 @@ def api_clear_chat_history():
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
+        # 先查找将要删除的图片消息，以便后续删除文件
+        cursor.execute('''
+            SELECT i.filename 
+            FROM messages m
+            JOIN images i ON i.id = CAST(SUBSTR(m.content, 5) AS INTEGER)
+            WHERE ((m.sender = ? AND m.recipient = ?) OR (m.sender = ? AND m.recipient = ?))
+            AND m.content LIKE 'Pic_%'
+        ''', (current_user, friend_name, friend_name, current_user))
+        
+        image_files = cursor.fetchall()
+        
+        # 删除图片文件
+        for (filename,) in image_files:
+            file_path = UPLOAD_FOLDER / filename
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    print(f"删除图片文件失败 {file_path}: {e}")
+        
         # 删除两个用户之间的所有消息记录
         cursor.execute('''
             DELETE FROM messages 
@@ -441,35 +461,13 @@ def api_clear_chat_history():
         # 删除与这些消息相关的已读标记
         cursor.execute('''
             DELETE FROM read_messages 
-            WHERE message_id NOT IN (SELECT id FROM messages)
+            WHERE message_id NOT IN (SELECT id FROM messages WHERE id IS NOT NULL)
         ''')
         
-        # 查找并删除与这些消息相关的图片记录和文件
-        cursor.execute('''
-            SELECT id, filename FROM images 
-            WHERE id IN (
-                SELECT CAST(SUBSTR(content, 5) AS INTEGER) 
-                FROM messages 
-                WHERE content LIKE 'Pic_%'
-            )
-        ''')
-        
-        image_records = cursor.fetchall()
-        
-        # 删除图片文件
-        for image_id, filename in image_records:
-            file_path = UPLOAD_FOLDER / filename
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        
-        # 删除图片记录
+        # 删除与这些消息相关的图片记录
         cursor.execute('''
             DELETE FROM images 
-            WHERE id IN (
-                SELECT CAST(SUBSTR(content, 5) AS INTEGER) 
-                FROM messages 
-                WHERE content LIKE 'Pic_%'
-            )
+            WHERE id NOT IN (SELECT CAST(SUBSTR(content, 5) AS INTEGER) FROM messages WHERE content LIKE 'Pic_%' AND id IS NOT NULL)
         ''')
         
         conn.commit()
@@ -477,7 +475,8 @@ def api_clear_chat_history():
         
         return jsonify({'ok': True, 'msg': '聊天记录已清空'})
     except Exception as e:
-        return jsonify({'ok': False, 'msg': '清空聊天记录失败'}), 500
+        print(f"清空聊天记录失败: {e}")  # 添加详细的错误日志
+        return jsonify({'ok': False, 'msg': f'清空聊天记录失败: {str(e)}'}), 500
 
 @app.route('/api/unread-messages')
 def api_unread_messages():
