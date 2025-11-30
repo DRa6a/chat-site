@@ -683,12 +683,24 @@ def music_search():
                 for artist in song.get('ar', []):
                     artists.append(artist.get('name', ''))
                 
+                # 检查是否为VIP歌曲
+                is_vip = False
+                if 'privilege' in song:
+                    # 如果有privilege字段，检查fee和payed字段
+                    privilege = song['privilege']
+                    fee = privilege.get('fee', 0)
+                    payed = privilege.get('payed', 0)
+                    # fee=1表示付费歌曲，payed=0表示未付费
+                    if fee == 1 and payed == 0:
+                        is_vip = True
+                
                 songs.append({
                     'id': song.get('id'),
                     'name': song.get('name'),
                     'artists': artists,
                     'album': song.get('al', {}).get('name', ''),
-                    'picUrl': song.get('al', {}).get('picUrl', '')
+                    'picUrl': song.get('al', {}).get('picUrl', ''),
+                    'isVip': is_vip  # 添加VIP标识
                 })
             
             return jsonify({'ok': True, 'songs': songs})

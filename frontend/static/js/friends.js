@@ -891,13 +891,20 @@ class ChatApp {
 
             // 音乐消息使用特殊样式
             messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
+            
+            // 构建音乐消息HTML，包括VIP标识（如果有的话）
+            let vipBadge = '';
+            if (musicInfo.isVip) {
+                vipBadge = '<span class="music-vip-badge">VIP</span>';
+            }
+            
             messageElement.innerHTML = `
                 <div class="music-message">
                     <div class="music-cover">
                         <img src="${musicInfo.picUrl || '/static/images/music-placeholder.png'}" alt="专辑封面" onerror="this.src='/static/images/music-placeholder.png'">
                     </div>
                     <div class="music-info">
-                        <div class="music-title">${this.escapeHtml(musicInfo.name)}</div>
+                        <div class="music-title">${this.escapeHtml(musicInfo.name)} ${vipBadge}</div>
                         <div class="music-artist">${this.escapeHtml(musicInfo.artists.join(', '))}</div>
                         <div class="music-controls">
                             <button class="music-play-btn" data-music-id="${musicInfo.id}">
