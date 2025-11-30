@@ -13,6 +13,11 @@ class ChatApp {
         this.lastMessageCount = 0;
         this.hasNewMessage = false;
         this.originalTitle = document.title;
+        
+        // 图片查看器相关属性
+        this.imageMessages = []; // 存储所有图片消息
+        this.currentImageIndex = 0; // 当前查看的图片索引
+        
         this.init();
     }
 
@@ -24,6 +29,9 @@ class ChatApp {
         this.scrollToBottom();
         // 启动轮询机制，每2秒检查一次新消息
         this.startPolling();
+        
+        // 创建图片查看器
+        this.createImageViewer();
     }
 
     setupEventListeners() {
@@ -64,6 +72,216 @@ class ChatApp {
         window.addEventListener('focus', () => {
             this.clearNewMessageIndicator();
         });
+        
+        // 图片查看器事件监听器 (推迟到图片查看器创建后再设置)
+        // 这些监听器将在 createImageViewer 方法中设置
+    }
+    
+    // 创建图片查看器
+    createImageViewer() {
+        const imageViewerModal = document.createElement('div');
+        imageViewerModal.id = 'image-viewer-modal';
+        imageViewerModal.className = 'modal';
+        imageViewerModal.innerHTML = `
+            <div class="image-viewer-content">
+                <span class="close-btn" id="close-image-viewer">&times;</span>
+                <div class="image-container">
+                    <img id="viewer-image" src="" alt="图片查看">
+                </div>
+                <div class="image-navigation">
+                    <button id="prev-image" class="nav-btn">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="image-info">
+                        <span id="current-image-index">1</span>/<span id="total-images">1</span>
+                    </div>
+                    <button id="next-image" class="nav-btn">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="image-actions">
+                    <button id="download-image" class="action-btn">
+                        <i class="fas fa-download"></i> 下载
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(imageViewerModal);
+        
+        // 现在设置图片查看器的事件监听器
+        this.setupImageViewerListeners();
+    }
+    
+    setupImageViewerListeners() {
+        // 确保图片查看器元素存在
+        const imageViewerModal = document.getElementById('image-viewer-modal');
+        if (!imageViewerModal) {
+            console.error('图片查看器模态框未找到');
+            return;
+        }
+        
+        const closeImageViewer = document.getElementById('close-image-viewer');
+        const prevImageBtn = document.getElementById('prev-image');
+        const nextImageBtn = document.getElementById('next-image');
+        const downloadImageBtn = document.getElementById('download-image');
+        
+        // 关闭图片查看器
+        if (closeImageViewer) {
+            closeImageViewer.addEventListener('click', () => {
+                this.closeImageViewer();
+            });
+        }
+        
+        // 点击模态框外部关闭
+        imageViewerModal.addEventListener('click', (event) => {
+            if (event.target === imageViewerModal) {
+                this.closeImageViewer();
+            }
+        });
+        
+        // 上一张图片
+        if (prevImageBtn) {
+            prevImageBtn.addEventListener('click', () => {
+                this.showPrevImage();
+            });
+        }
+        
+        // 下一张图片
+        if (nextImageBtn) {
+            nextImageBtn.addEventListener('click', () => {
+                this.showNextImage();
+            });
+        }
+        
+        // 下载图片
+        if (downloadImageBtn) {
+            downloadImageBtn.addEventListener('click', () => {
+                this.downloadCurrentImage();
+            });
+        }
+        
+        // 键盘事件（ESC关闭，左右箭头切换图片）
+        document.addEventListener('keydown', (event) => {
+            const imageViewerModal = document.getElementById('image-viewer-modal');
+            if (imageViewerModal && imageViewerModal.style.display === 'block') {
+                switch (event.key) {
+                    case 'Escape':
+                        this.closeImageViewer();
+                        break;
+                    case 'ArrowLeft':
+                        this.showPrevImage();
+                        break;
+                    case 'ArrowRight':
+                        this.showNextImage();
+                        break;
+                }
+            }
+        });
+    }
+    
+    // 打开图片查看器
+    openImageViewer(imageId, imageElement) {
+        // 收集所有图片消息
+        this.collectImageMessages();
+        
+        // 找到点击的图片在数组中的位置
+        this.currentImageIndex = this.imageMessages.findIndex(msg => 
+            msg.element === imageElement || msg.id === imageId);
+        
+        if (this.currentImageIndex === -1) {
+            this.currentImageIndex = 0;
+        }
+        
+        // 显示图片查看器
+        this.showCurrentImage();
+        const imageViewerModal = document.getElementById('image-viewer-modal');
+        if (imageViewerModal) {
+            imageViewerModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        }
+    }
+    
+    // 关闭图片查看器
+    closeImageViewer() {
+        const imageViewerModal = document.getElementById('image-viewer-modal');
+        if (imageViewerModal) {
+            imageViewerModal.style.display = 'none';
+            document.body.style.overflow = ''; // 恢复背景滚动
+        }
+    }
+    
+    // 收集所有图片消息
+    collectImageMessages() {
+        const messageElements = document.querySelectorAll('.message-image img');
+        this.imageMessages = Array.from(messageElements).map((img, index) => {
+            // 从图片src中提取图片ID
+            const src = img.src;
+            const urlParts = src.split('/');
+            const imageId = urlParts[urlParts.length - 1];
+            
+            return {
+                id: imageId,
+                element: img,
+                src: src
+            };
+        });
+    }
+    
+    // 显示当前图片
+    showCurrentImage() {
+        if (this.imageMessages.length === 0) return;
+        
+        const currentImage = this.imageMessages[this.currentImageIndex];
+        const viewerImage = document.getElementById('viewer-image');
+        if (viewerImage) {
+            viewerImage.src = currentImage.src;
+        }
+        
+        // 更新图片信息
+        const currentImageIndexElement = document.getElementById('current-image-index');
+        const totalImagesElement = document.getElementById('total-images');
+        if (currentImageIndexElement && totalImagesElement) {
+            currentImageIndexElement.textContent = this.currentImageIndex + 1;
+            totalImagesElement.textContent = this.imageMessages.length;
+        }
+        
+        // 控制导航按钮的显示
+        const prevImageBtn = document.getElementById('prev-image');
+        const nextImageBtn = document.getElementById('next-image');
+        if (prevImageBtn && nextImageBtn) {
+            prevImageBtn.disabled = this.currentImageIndex === 0;
+            nextImageBtn.disabled = this.currentImageIndex === this.imageMessages.length - 1;
+        }
+    }
+    
+    // 显示上一张图片
+    showPrevImage() {
+        if (this.currentImageIndex > 0) {
+            this.currentImageIndex--;
+            this.showCurrentImage();
+        }
+    }
+    
+    // 显示下一张图片
+    showNextImage() {
+        if (this.currentImageIndex < this.imageMessages.length - 1) {
+            this.currentImageIndex++;
+            this.showCurrentImage();
+        }
+    }
+    
+    // 下载当前图片
+    downloadCurrentImage() {
+        if (this.imageMessages.length === 0) return;
+        
+        const currentImage = this.imageMessages[this.currentImageIndex];
+        const link = document.createElement('a');
+        link.href = currentImage.src;
+        link.download = `image_${currentImage.id}.jpg`; // 默认文件名
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     loadTheme() {
@@ -166,8 +384,6 @@ class ChatApp {
                 if (result.ok) {
                     // 清空文件选择
                     document.getElementById('image-upload').value = '';
-                    this.scrollToBottom();
-                    
                     // 立即检查新消息以确保显示最新内容
                     setTimeout(() => this.checkForNewMessages(), 100);
                 } else {
@@ -210,8 +426,13 @@ class ChatApp {
                 messageElement.style.alignSelf = 'flex-start';
             }
             
-            // 处理图片加载完成后的滚动
+            // 为图片添加点击事件，打开图片查看器
             const img = messageElement.querySelector('img');
+            img.addEventListener('click', () => {
+                this.openImageViewer(imageId, img);
+            });
+            
+            // 处理图片加载完成后的滚动
             img.onload = () => {
                 // 图片加载完成后重新滚动到底部
                 this.scrollToBottom();
@@ -229,9 +450,6 @@ class ChatApp {
         }
 
         container.appendChild(messageElement);
-        
-        // 确保消息容器滚动到底部（对于文本消息立即执行，图片消息会在图片加载完成后执行）
-        this.scrollToBottom();
         
         // 返回创建的元素，以便调用者可以进一步处理
         return messageElement;
@@ -256,6 +474,9 @@ class ChatApp {
                 const container = document.getElementById('chat-messages');
                 container.innerHTML = '';
 
+                // 创建一个Promise数组来跟踪所有图片加载
+                const imagePromises = [];
+                
                 result.history.forEach((msg, index) => {
                     const message = {
                         sender: msg.sender,
@@ -285,11 +506,34 @@ class ChatApp {
                         this.addTimeDivider(message.timestamp);
                     }
                     
-                    this.addMessageToUI(message, isOwnMessage);
+                    // 添加消息到UI
+                    const messageElement = this.addMessageToUI(message, isOwnMessage);
+                    
+                    // 如果是图片消息，将图片加载Promise添加到数组中
+                    if (message.content.startsWith('Pic_')) {
+                        const img = messageElement.querySelector('img');
+                        const imgPromise = new Promise((resolve) => {
+                            img.onload = () => {
+                                resolve();
+                            };
+                            img.onerror = () => {
+                                resolve(); // 即使加载失败也继续
+                            };
+                        });
+                        imagePromises.push(imgPromise);
+                    }
                 });
 
                 this.lastMessageCount = result.history.length;
-                this.scrollToBottom();
+                
+                // 等待所有图片加载完成后再滚动到底部
+                if (imagePromises.length > 0) {
+                    Promise.all(imagePromises).then(() => {
+                        this.scrollToBottom();
+                    });
+                } else {
+                    this.scrollToBottom();
+                }
             } else {
                 console.error('加载聊天历史失败:', result.msg);
             }
@@ -357,8 +601,6 @@ class ChatApp {
 
                     // 只处理新增的消息，而不是清空整个容器
                     const startIndex = this.lastMessageCount;
-                    // 创建一个Promise数组来跟踪所有图片加载
-                    const imagePromises = [];
                     
                     for (let i = startIndex; i < result.history.length; i++) {
                         const msg = result.history[i];
@@ -391,29 +633,10 @@ class ChatApp {
                         }
                         
                         // 添加消息到UI
-                        const messageElement = this.addMessageToUI(message, isOwnMessage);
-                        
-                        // 如果是图片消息，将图片加载Promise添加到数组中
-                        if (message.content.startsWith('Pic_')) {
-                            const img = messageElement.querySelector('img');
-                            const imgPromise = new Promise((resolve) => {
-                                img.onload = () => resolve();
-                                img.onerror = () => resolve(); // 即使加载失败也继续
-                            });
-                            imagePromises.push(imgPromise);
-                        }
+                        this.addMessageToUI(message, isOwnMessage);
                     }
 
                     this.lastMessageCount = result.history.length;
-                    
-                    // 等待所有图片加载完成后再滚动到底部
-                    if (imagePromises.length > 0) {
-                        Promise.all(imagePromises).then(() => {
-                            this.scrollToBottom();
-                        });
-                    } else {
-                        this.scrollToBottom();
-                    }
                     
                     // 如果不是自己发送的消息，则显示新消息提示
                     const lastMessage = result.history[result.history.length - 1];
@@ -562,6 +785,8 @@ class ChatApp {
         this.stopPolling();
         // 标记消息为已读
         this.markMessagesAsRead();
+        // 关闭图片查看器
+        this.closeImageViewer();
     }
 }
 
