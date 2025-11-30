@@ -139,10 +139,15 @@ def load_chat_history(user1, user2):
         
         messages = []
         for row in cursor.fetchall():
+            content = row[2]
+            # 去掉消息内容的Chat_前缀（只去掉一个）
+            if content.startswith("Chat_"):
+                content = content[5:]  # 去掉"Chat_"前缀
+                
             messages.append({
                 "id": row[0],
                 "sender": row[1],
-                "content": row[2],
+                "content": content,
                 "timestamp": row[3]
             })
         
@@ -154,15 +159,18 @@ def load_chat_history(user1, user2):
 
 def save_chat_message(user1, user2, sender, content):
     """保存聊天消息"""
-    # 保存到数据库
+    # 保存到数据库，添加Chat_前缀
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
+        # 添加Chat_前缀到消息内容
+        prefixed_content = "Chat_" + content
+        
         cursor.execute('''
             INSERT INTO messages (sender, recipient, content, timestamp)
             VALUES (?, ?, ?, ?)
-        ''', (sender, user2, content, datetime.now().isoformat()))
+        ''', (sender, user2, prefixed_content, datetime.now().isoformat()))
         
         message_id = cursor.lastrowid
         conn.commit()
@@ -173,7 +181,7 @@ def save_chat_message(user1, user2, sender, content):
         socketio.emit('new_message', {
             'sender': sender,
             'recipient': user2,
-            'content': content,
+            'content': content,  # 发送时不带前缀
             'timestamp': datetime.now().isoformat()
         }, room=room)
         
