@@ -104,6 +104,40 @@
             </div>
 
             <div class="settings-section">
+                <div class="settings-item">
+                    <button id="edit-nickname-btn" class="glass btn-block">
+                        <i class="fas fa-user-edit"></i> 修改好友昵称
+                    </button>
+                </div>
+
+                <div class="settings-item">
+                    <button id="clear-chat-btn" class="glass btn-block clear-btn">
+                        <i class="fas fa-trash-alt"></i> 清空聊天记录
+                    </button>
+                </div>
+
+                <div class="settings-item">
+                    <button id="delete-friend-btn" class="glass btn-block delete-btn">
+                        <i class="fas fa-user-times"></i> 删除好友
+                    </button>
+                </div>
+                
+                <!-- 添加反馈入口 -->
+                <div class="settings-item">
+                    <a href="/feedback" class="glass btn-block" style="text-decoration: none; display: block; text-align: center;">
+                        <i class="fas fa-comment-alt"></i> 意见反馈
+                    </a>
+                </div>
+                
+                <!-- 页面大小调整设置 -->
+                <div class="settings-item">
+                    <label for="font-size-slider">字体大小</label>
+                    <input type="range" id="font-size-slider" min="12" max="24" value="16" class="settings-slider">
+                    <span id="font-size-value">16px</span>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <h3>关于</h3>
                 <div class="about-section">
                     <p><strong>版本:</strong> v1.2.0</p>
@@ -128,6 +162,7 @@
                             <li>完善退出聊天界面时未读消息状态更新机制</li>
                             <li>集成网易云音乐API，支持音乐搜索和分享功能</li>
                             <li>优化音乐播放器UI，添加进度条和时间显示</li>
+                            <li>添加反馈系统，支持BUG报告、意见反馈和计划提议</li>
                         </ul>
                     </div>
                 </div>

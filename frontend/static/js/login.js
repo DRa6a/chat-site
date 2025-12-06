@@ -58,77 +58,97 @@ function loginWithXHR(username, password) {
     });
 }
 
-document.getElementById('login-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const u = document.getElementById('username').value.trim();
-    const p = document.getElementById('password').value;
-    
-    let data;
+document.addEventListener('DOMContentLoaded', function() {
+    // 检测主题设置
     try {
-        if (isFetchSupported()) {
-            // 使用现代的 fetch API
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: u, password: p})
-            });
-            data = await res.json();
-        } else {
-            // 使用传统的 XMLHttpRequest 作为备选
-            data = await loginWithXHR(u, p);
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark') {
+            document.documentElement.classList.add('theme-dark');
         }
-        
-        if (data.ok) {
-            showFeedback('登录成功! (^▽^)', 'success');
-            // 生成唯一的会话ID
-            const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            // 构造用户信息对象
-            const userInfo = {username: u, password: p};
-            
-            try {
-                // 使用sessionStorage存储用户信息，确保每个标签页独立
-                sessionStorage.setItem('chat-session-id', sessionId);
-                sessionStorage.setItem('chat-user', u);
-                sessionStorage.setItem('user-info', JSON.stringify(userInfo));
-                
-                // 在localStorage中存储会话信息，用于在页面刷新时恢复
-                let sessions = {};
+    } catch(e) {
+        console.log('无法访问localStorage:', e);
+    }
+
+    // 主题切换
+    const themeCb = document.getElementById('theme-cb');
+    if (themeCb) {
+        themeCb.checked = document.documentElement.classList.contains('theme-dark');
+        themeCb.addEventListener('change', function() {
+            if (this.checked) {
+                document.documentElement.classList.add('theme-dark');
                 try {
-                    sessions = JSON.parse(localStorage.getItem('chat-sessions') || '{}');
-                } catch (e) {
-                    console.error('解析会话信息时出错:', e);
-                    sessions = {};
+                    localStorage.setItem('theme', 'dark');
+                } catch(e) {
+                    console.log('无法保存主题设置:', e);
                 }
-                
-                sessions[sessionId] = {
-                    user: u,
-                    userInfo: userInfo,
-                    timestamp: Date.now()
-                };
-                
-                localStorage.setItem('chat-sessions', JSON.stringify(sessions));
-                
-                console.log('会话信息保存成功:', {
-                    sessionId: sessionId,
-                    user: u,
-                    timestamp: Date.now()
-                });
-            } catch(e) {
-                console.error('存储会话信息时出错:', e);
-                showFeedback('会话信息存储失败', 'error');
-                return;
+            } else {
+                document.documentElement.classList.remove('theme-dark');
+                try {
+                    localStorage.setItem('theme', 'light');
+                } catch(e) {
+                    console.log('无法保存主题设置:', e);
+                }
             }
-            
-            // 增加延迟确保会话信息保存完成后再跳转
+        });
+    }
+
+    // 登录表单提交
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            login();
+        });
+    }
+});
+
+async function login() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+        showFeedback('请填写用户名和密码', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (data.ok) {
+            // 保存用户信息到 sessionStorage
+            sessionStorage.setItem('chat-user', username);
+            showFeedback('登录成功，正在跳转...', 'success');
+            // 跳转到主页
             setTimeout(() => {
-                console.log('正在跳转到主页...');
                 location.href = '/';
-            }, 1500);
+            }, 1000);
         } else {
             showFeedback('用户名或密码错误', 'error');
         }
     } catch (error) {
-        console.error('登录错误:', error);
-        showFeedback('登录失败: ' + error.message, 'error');
+        console.error('登录失败:', error);
+        showFeedback('登录时发生错误', 'error');
     }
-});
+}
+
+function showFeedback(message, type) {
+    const feedback = document.getElementById('feedback');
+    if (feedback) {
+        feedback.textContent = message;
+        feedback.className = type;
+        feedback.style.display = 'block';
+        
+        // 3秒后自动隐藏
+        setTimeout(() => {
+            feedback.style.display = 'none';
+        }, 3000);
+    }
+}

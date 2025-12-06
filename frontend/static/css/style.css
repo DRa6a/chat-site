@@ -651,6 +651,207 @@ input.glass::placeholder {
     color: #ff4d4f;
 }
 
+/* 反馈系统专用样式 */
+.feedback-item {
+    text-align: left;
+    padding: 15px;
+}
+
+.feedback-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.feedback-id {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+.feedback-type {
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.feedback-type.bug {
+    background-color: rgba(255, 77, 79, 0.2);
+    color: #ff4d4f;
+}
+
+.feedback-type.suggestion {
+    background-color: rgba(24, 144, 255, 0.2);
+    color: #1890ff;
+}
+
+.feedback-type.plan {
+    background-color: rgba(47, 197, 119, 0.2);
+    color: #2fc577;
+}
+
+.feedback-location {
+    font-size: 0.9em;
+    margin-bottom: 5px;
+    opacity: 0.8;
+}
+
+.feedback-time {
+    font-size: 0.8em;
+    margin-bottom: 5px;
+    opacity: 0.7;
+}
+
+.feedback-author {
+    font-size: 0.8em;
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+.feedback-content {
+    margin-bottom: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.feedback-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.upvote-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.upvote-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.upvote-btn.upvoted {
+    color: #ff4d4f;
+    border-color: rgba(255, 77, 79, 0.5);
+}
+
+.theme-dark .upvote-btn.upvoted {
+    color: #ff6b6b;
+    border-color: rgba(255, 107, 107, 0.5);
+}
+
+.upvote-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.theme-dark .upvote-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#feedback-content {
+    width: 100%;
+    resize: vertical;
+    min-height: 120px;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--font-color);
+    font-family: inherit;
+    font-size: 15px;
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+#feedback-content:focus {
+    outline: none;
+    border-color: #0078ff;
+    box-shadow: 0 0 0 2px rgba(0, 120, 255, 0.2);
+}
+
+select.glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 12px 15px;
+    color: var(--font-color);
+    font-size: 15px;
+    margin-bottom: 15px;
+    width: 100%;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 16px;
+}
+
+select.glass:focus {
+    outline: none;
+    border-color: #0078ff;
+    box-shadow: 0 0 0 2px rgba(0, 120, 255, 0.2);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.filter-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.add-friend-container h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+}
+
+.add-friend-container h3 i {
+    font-size: 1.1rem;
+}
+
+.input-group button.glass,
+.form-group button.glass {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.input-group button.glass:hover,
+.form-group button.glass:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.btn-block {
+    width: 100%;
+}
+
 /* 未读消息提示 */
 .unread-badge {
     position: absolute;
@@ -1476,4 +1677,33 @@ input.glass::placeholder {
         width: 90%;
         font-size: 14px;
     }
+}
+
+.delete-feedback-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    cursor: pointer;
+    color: #ff4d4f;
+}
+
+.delete-feedback-btn:hover {
+    background: rgba(255, 77, 79, 0.1);
+}
+
+.no-feedback {
+    text-align: center;
+    padding: 20px;
+    opacity: 0.7;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
 }

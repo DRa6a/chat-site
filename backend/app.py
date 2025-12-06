@@ -236,6 +236,10 @@ def login_page():
 def chat_room(friend):
     return render_template('chat.html', friend=friend)
 
+@app.route('/feedback')
+def feedback():
+    return render_template('feedback.html')
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
     users = load_users()
@@ -806,6 +810,271 @@ def music_lyric():
     except Exception as e:
         print(f"获取歌词出错: {e}")
         return jsonify({'ok': False, 'msg': f'获取歌词出错: {str(e)}'}), 500
+
+# 反馈系统相关接口
+FEEDBACK_FILE = ROOT / 'data' / 'feedback.json'
+OPS_FILE = ROOT / 'data' / 'ops.json'
+
+def load_feedback():
+    """加载反馈数据"""
+    try:
+        with open(FEEDBACK_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"feedback": []}
+
+def save_feedback(data):
+    """保存反馈数据"""
+    with open(FEEDBACK_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def load_ops():
+    """加载管理员列表"""
+    try:
+        with open(OPS_FILE, 'r', encoding='utf-8') as f:
+            return set(json.load(f))
+    except FileNotFoundError:
+        return set()
+
+def is_op(user):
+    """检查用户是否为管理员"""
+    ops = load_ops()
+    return user in ops
+
+def generate_feedback_id(feedback_type, location, time_str):
+    """生成反馈ID"""
+    type_codes = {
+        "bug": "CB",
+        "suggestion": "CA",
+        "plan": "CP"
+    }
+    
+    type_code = type_codes.get(feedback_type, "CX")
+    
+    # 获取当前同类型同位置的反馈数量，用于生成序号
+    feedback_data = load_feedback()
+    count = 1
+    for item in feedback_data["feedback"]:
+        if item["type"] == feedback_type and item["location"] == location and item["time"].startswith(time_str[:8]):
+            count += 1
+    
+    # 格式化序号为4位数字
+    serial_number = f"{count:04d}"
+    
+    return f"{type_code}-{location}-{time_str}-{serial_number}"
+
+@app.route('/api/feedback/submit', methods=['POST'])
+def submit_feedback():
+    """提交反馈"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    try:
+        # 获取参数
+        data = request.json
+        feedback_type = data.get('type', '')
+        location = data.get('location', '')
+        content = data.get('content', '').strip()
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': '请求数据格式错误'}), 400
+    
+    # 验证参数
+    if not feedback_type or feedback_type not in ['bug', 'suggestion', 'plan']:
+        return jsonify({'ok': False, 'msg': '反馈类型无效'}), 400
+    
+    if not location:
+        return jsonify({'ok': False, 'msg': '反馈位置不能为空'}), 400
+    
+    if not content:
+        return jsonify({'ok': False, 'msg': '反馈内容不能为空'}), 400
+    
+    # 检查权限：只有OP可以提交计划类型反馈
+    if feedback_type == 'plan' and not is_op(current_user):
+        return jsonify({'ok': False, 'msg': '只有管理员可以提交计划类型的反馈'}), 403
+    
+    # 生成时间戳
+    now = datetime.now()
+    time_str = now.strftime("%Y%m%d%H%M%S")
+    
+    # 生成反馈ID
+    feedback_id = generate_feedback_id(feedback_type, location, time_str)
+    
+    # 创建反馈项
+    feedback_item = {
+        "id": feedback_id,
+        "type": feedback_type,
+        "location": location,
+        "time": time_str,
+        "content": content,
+        "author": current_user,
+        "upvotes": 0,
+        "upvoted_by": []  # 点赞用户列表
+    }
+    
+    # 保存反馈
+    feedback_data = load_feedback()
+    feedback_data["feedback"].append(feedback_item)
+    save_feedback(feedback_data)
+    
+    return jsonify({'ok': True, 'msg': '反馈提交成功'})
+
+@app.route('/api/feedback/list')
+def list_feedback():
+    """获取反馈列表"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 加载反馈数据
+    feedback_data = load_feedback()
+    feedback_list = feedback_data["feedback"]
+    
+    # 为每个反馈项添加用户是否已点赞的标记
+    for feedback in feedback_list:
+        feedback["userUpvoted"] = current_user in feedback["upvoted_by"]
+    
+    return jsonify({'ok': True, 'feedback': feedback_list})
+
+@app.route('/api/user/op-status', methods=['POST'])
+def check_op_status():
+    """检查用户是否为OP"""
+    data = request.json
+    username = data.get('username', '') if data else ''
+    
+    if not username:
+        return jsonify({'ok': False, 'msg': '用户名不能为空'}), 400
+    
+    is_op_user = is_op(username)
+    return jsonify({'ok': True, 'isOP': is_op_user})
+
+@app.route('/api/feedback/upvote', methods=['POST'])
+def upvote_feedback():
+    """点赞反馈"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 获取参数
+    feedback_id = request.json.get('id', '')
+    
+    if not feedback_id:
+        return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
+    
+    # 查找反馈项
+    feedback_data = load_feedback()
+    feedback_item = None
+    for item in feedback_data["feedback"]:
+        if item["id"] == feedback_id:
+            feedback_item = item
+            break
+    
+    if not feedback_item:
+        return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
+    
+    # 检查用户是否已经点赞
+    if current_user in feedback_item["upvoted_by"]:
+        return jsonify({'ok': False, 'msg': '您已经点赞过该反馈'}), 400
+    
+    # 添加点赞
+    feedback_item["upvoted_by"].append(current_user)
+    feedback_item["upvotes"] = len(feedback_item["upvoted_by"])
+    
+    # 保存数据
+    save_feedback(feedback_data)
+    
+    return jsonify({'ok': True, 'upvotes': feedback_item["upvotes"]})
+
+@app.route('/api/feedback/cancel-upvote', methods=['POST'])
+def cancel_upvote_feedback():
+    """取消点赞反馈"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 获取参数
+    feedback_id = request.json.get('id', '')
+    
+    if not feedback_id:
+        return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
+    
+    # 查找反馈项
+    feedback_data = load_feedback()
+    feedback_item = None
+    for item in feedback_data["feedback"]:
+        if item["id"] == feedback_id:
+            feedback_item = item
+            break
+    
+    if not feedback_item:
+        return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
+    
+    # 检查用户是否已经点赞
+    if current_user not in feedback_item["upvoted_by"]:
+        return jsonify({'ok': False, 'msg': '您还没有点赞该反馈'}), 400
+    
+    # 取消点赞
+    feedback_item["upvoted_by"].remove(current_user)
+    feedback_item["upvotes"] = len(feedback_item["upvoted_by"])
+    
+    # 保存数据
+    save_feedback(feedback_data)
+    
+    return jsonify({'ok': True, 'upvotes': feedback_item["upvotes"]})
+
+@app.route('/api/feedback/delete', methods=['POST'])
+def delete_feedback():
+    """删除反馈"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 获取参数
+    feedback_id = request.json.get('id', '')
+    
+    if not feedback_id:
+        return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
+    
+    # 查找反馈项
+    feedback_data = load_feedback()
+    feedback_item = None
+    feedback_index = -1
+    
+    for i, item in enumerate(feedback_data["feedback"]):
+        if item["id"] == feedback_id:
+            feedback_item = item
+            feedback_index = i
+            break
+    
+    if not feedback_item:
+        return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
+    
+    # 检查权限：只有反馈发送者或OP可以删除反馈
+    if feedback_item["author"] != current_user and not is_op(current_user):
+        return jsonify({'ok': False, 'msg': '您没有权限删除该反馈'}), 403
+    
+    # 删除反馈
+    del feedback_data["feedback"][feedback_index]
+    
+    # 保存数据
+    save_feedback(feedback_data)
+    
+    return jsonify({'ok': True, 'msg': '反馈删除成功'})
 
 @app.route('/flowStatistics')
 def flow_statistics():

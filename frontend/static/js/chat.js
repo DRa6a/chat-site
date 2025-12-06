@@ -300,3 +300,62 @@ window.addEventListener('storage', (event) => {
         setTimeout(checkUnreadMessages, 100);
     }
 });
+
+// 聊天设置功能
+document.addEventListener('DOMContentLoaded', function() {
+    const chatSettingsBtn = document.getElementById('chat-settings-btn');
+    const chatSettingsModal = document.getElementById('chat-settings-modal');
+    const closeChatSettings = document.getElementById('close-chat-settings');
+    const editNicknameBtn = document.getElementById('edit-nickname-btn');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    const deleteFriendBtn = document.getElementById('delete-friend-btn');
+    const peerName = document.getElementById('peername').textContent;
+
+    // 打开设置模态框
+    chatSettingsBtn.addEventListener('click', function() {
+        chatSettingsModal.style.display = 'block';
+    });
+
+    // 关闭设置模态框的统一方法
+    function closeSettings() {
+        chatSettingsModal.style.display = 'none';
+    }
+
+    // 绑定关闭事件
+    closeChatSettings.addEventListener('click', closeSettings);
+
+    // 点击模态框外部关闭
+    window.addEventListener('click', function(event) {
+        if (event.target === chatSettingsModal) {
+            closeSettings();
+        }
+    });
+
+    // 修改好友昵称
+    editNicknameBtn.addEventListener('click', function() {
+        const newNickname = prompt('请输入新的昵称:', peerName);
+        if (newNickname && newNickname.trim() !== '' && newNickname !== peerName) {
+            // 这里应该调用后端API来保存昵称
+            alert('功能开发中：修改好友昵称功能');
+        }
+        closeSettings();
+    });
+
+    // 清空聊天记录
+    clearChatBtn.addEventListener('click', function() {
+        if (confirm('确定要清空与 ' + peerName + ' 的所有聊天记录吗？此操作不可恢复！')) {
+            // 这里应该调用后端API来清空聊天记录
+            alert('功能开发中：清空聊天记录功能');
+        }
+        closeSettings();
+    });
+
+    // 删除好友
+    deleteFriendBtn.addEventListener('click', function() {
+        if (confirm('确定要删除好友 ' + peerName + ' 吗？')) {
+            // 这里应该调用后端API来删除好友关系
+            alert('功能开发中：删除好友功能');
+        }
+        closeSettings();
+    });
+});

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>反馈 - 聊天网站</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js"></script>
+    <script>
+        // 在页面加载前检测并应用主题，避免闪烁
+        (function() {
+            try {
+                const theme = localStorage.getItem('theme');
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('theme-dark');
+                }
+            } catch(e) {
+                console.log('无法访问localStorage:', e);
+            }
+        })();
+    </script>
+    <script>
+        // 简化会话检查
+        (function() {
+            console.log('开始检查会话状态...');
+            
+            try {
+                // 从sessionStorage获取用户信息
+                const user = sessionStorage.getItem('chat-user');
+                console.log('当前用户:', user);
+                
+                if (!user) {
+                    console.log('用户未登录，跳转到登录页');
+                    location.href = '/login';
+                    return;
+                }
+                
+                console.log('用户已登录:', user);
+            } catch(e) {
+                console.log('会话检查出错，跳转到登录页:', e);
+                location.href = '/login';
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="top-btns">
+            <a href="/" class="glass back-btn" title="返回首页">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <button id="settings-btn" class="glass" title="设置">
+                <i class="fas fa-cog"></i>
+            </button>
+            <label class="glass-switch" title="切换主题">
+                <input type="checkbox" id="theme-cb">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <header class="friend-header">
+        <h1 class="blue-text">反馈中心</h1>
+    </header>
+
+    <!-- 提交反馈区域 -->
+    <div class="add-friend-section">
+        <div class="add-friend-container glass">
+            <h3><i class="fas fa-paper-plane"></i> 提交反馈</h3>
+            <div class="form-group">
+                <select id="feedback-type" class="glass">
+                    <option value="bug">BUG</option>
+                    <option value="suggestion">意见</option>
+                    <option value="plan" id="plan-option">计划</option>
+                </select>
+                <select id="feedback-location" class="glass">
+                    <option value="backend">后端（backend）</option>
+                    <option value="login">登陆界面（login）</option>
+                    <option value="index">主界面（index）</option>
+                    <option value="chat">聊天界面（chat）</option>
+                    <option value="feedback">反馈界面</option>
+                    <option value="unknown">未知（unknown）</option>
+                    <option value="new">建议和计划新增内容（new）</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <textarea id="feedback-content" class="glass" placeholder="请输入反馈内容..." rows="5"></textarea>
+            </div>
+            <div class="form-group">
+                <button id="submit-feedback-btn" class="glass btn-block">
+                    <i class="fas fa-paper-plane"></i> 提交反馈
+                </button>
+            </div>
+            <!-- 页面内提示区域 -->
+            <div id="feedback-message" class="feedback-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 反馈筛选 -->
+    <div class="add-friend-section">
+        <div class="add-friend-container glass">
+            <h3><i class="fas fa-filter"></i> 筛选反馈</h3>
+            <div class="form-group">
+                <select id="filter-type" class="glass">
+                    <option value="all">全部类型</option>
+                    <option value="bug">BUG</option>
+                    <option value="suggestion">意见</option>
+                    <option value="plan">计划</option>
+                </select>
+                <select id="filter-location" class="glass">
+                    <option value="all">全部位置</option>
+                    <option value="backend">后端（backend）</option>
+                    <option value="login">登陆界面（login）</option>
+                    <option value="index">主界面（index）</option>
+                    <option value="chat">聊天界面（chat）</option>
+                    <option value="feedback">反馈界面</option>
+                    <option value="unknown">未知（unknown）</option>
+                    <option value="new">建议和计划新增内容（new）</option>
+                </select>
+            </div>
+            <div class="form-group filter-buttons">
+                <button id="reset-filter-btn" class="glass">
+                    <i class="fas fa-redo"></i> 重置筛选
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 反馈列表 -->
+    <main class="friend-only">
+        <div class="friend-cards glass" id="feedback-list">
+            <div class="loading">加载中...</div>
+        </div>
+    </main>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h2>设置</h2>
+                <span class="close-btn" id="close-settings">&times;</span>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-item">
+                    <label for="username-input">用户名</label>
+                    <div class="input-group">
+                        <input type="text" id="username-input" class="glass" value="">
+                        <button id="save-username-btn" class="glass btn-small">保存</button>
+                    </div>
+                </div>
+
+                <div class="settings-item">
+                    <label for="password-input">密码</label>
+                    <div class="input-group">
+                        <input type="text" id="password-input" class="glass" value="">
+                        <button id="save-password-btn" class="glass btn-small">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3>关于</h3>
+                <div class="about-section">
+                    <p><strong>版本:</strong> v1.2.0</p>
+                    <p><strong>项目地址:</strong> <a href="https://github.com/DRa6a/chat-site" target="_blank" rel="noopener noreferrer"><i class="fab fa-github"></i> GitHub</a></p>
+                </div>
+            </div>
+
+            <div class="settings-footer">
+                <button id="logout-btn" class="glass btn-block">退出登录</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/friends.js"></script>
+    <script src="/static/js/login.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script>
+        // 全局变量存储原始反馈数据
+        let allFeedback = [];
+        let filteredFeedback = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取反馈列表
+            loadFeedbackList();
+            
+            // 提交反馈
+            document.getElementById('submit-feedback-btn').addEventListener('click', submitFeedback);
+            
+            // 筛选功能
+            document.getElementById('filter-type').addEventListener('change', applyFilter);
+            document.getElementById('filter-location').addEventListener('change', applyFilter);
+            document.getElementById('reset-filter-btn').addEventListener('click', resetFilter);
+            
+            // 检查用户是否为OP，如果不是则隐藏计划选项
+            checkUserOPStatus();
+        });
+
+        // 检查用户是否为OP
+        function checkUserOPStatus() {
+            fetch('/api/user/op-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: sessionStorage.getItem('chat-user') })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok && !data.isOP) {
+                    // 隐藏计划选项
+                    document.getElementById('plan-option').style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('检查用户OP状态失败:', error);
+            });
+        }
+
+        // 加载反馈列表
+        function loadFeedbackList() {
+            fetch('/api/feedback/list', {
+                method: 'GET',
+                headers: {
+                    'X-User': sessionStorage.getItem('chat-user')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok) {
+                    allFeedback = data.feedback;
+                    filteredFeedback = [...allFeedback];
+                    displayFeedbackList(filteredFeedback);
+                } else {
+                    showFeedbackMessage('加载反馈列表失败: ' + data.msg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFeedbackMessage('加载反馈列表时发生错误', 'error');
+            });
+        }
+
+        // 显示反馈列表
+        function displayFeedbackList(feedbackList) {
+            const feedbackContainer = document.getElementById('feedback-list');
+            feedbackContainer.innerHTML = '';
+
+            if (feedbackList.length === 0) {
+                feedbackContainer.innerHTML = '<div class="no-feedback">暂无反馈</div>';
+                return;
+            }
+
+            // 按点赞数排序
+            feedbackList.sort((a, b) => b.upvotes - a.upvotes);
+
+            // 获取当前用户
+            const currentUser = sessionStorage.getItem('chat-user');
+
+            feedbackList.forEach(feedback => {
+                const feedbackElement = document.createElement('div');
+                feedbackElement.className = 'friend-card feedback-item';
+                
+                // 构造反馈内容HTML
+                let feedbackHTML = `
+                    <div class="feedback-header">
+                        <span class="feedback-id">${feedback.id}</span>
+                        <span class="feedback-type ${feedback.type}">${getTypeDisplayName(feedback.type)}</span>
+                    </div>
+                    <div class="feedback-location">${getLocationDisplayName(feedback.location)}</div>
+                    <div class="feedback-time">${formatFeedbackTime(feedback.time)}</div>
+                    <div class="feedback-author">提交者: ${escapeHtml(feedback.author)}</div>
+                    <div class="feedback-content">${escapeHtml(feedback.content)}</div>
+                    <div class="feedback-actions">
+                        <button class="upvote-btn glass ${feedback.userUpvoted ? 'upvoted' : ''}" data-id="${feedback.id}">
+                            <i class="fas fa-thumbs-up"></i> 
+                            <span class="upvote-count">${feedback.upvotes}</span>
+                        </button>
+                `;
+                
+                // 如果是当前用户提交的反馈，添加删除按钮
+                if (feedback.author === currentUser) {
+                    feedbackHTML += `
+                        <button class="delete-feedback-btn glass" data-id="${feedback.id}" title="删除反馈">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    `;
+                }
+                
+                feedbackHTML += `
+                    </div>
+                `;
+                
+                feedbackElement.innerHTML = feedbackHTML;
+                feedbackContainer.appendChild(feedbackElement);
+            });
+
+            // 绑定点赞事件
+            document.querySelectorAll('.upvote-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const feedbackId = this.getAttribute('data-id');
+                    upvoteFeedback(feedbackId, this);
+                });
+            });
+            
+            // 绑定删除事件
+            document.querySelectorAll('.delete-feedback-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const feedbackId = this.getAttribute('data-id');
+                    deleteFeedback(feedbackId, this);
+                });
+            });
+        }
+
+        // 获取反馈类型显示名称
+        function getTypeDisplayName(type) {
+            const types = {
+                'bug': 'BUG',
+                'suggestion': '意见',
+                'plan': '计划'
+            };
+            return types[type] || type;
+        }
+
+        // 获取位置显示名称
+        function getLocationDisplayName(location) {
+            const locations = {
+                'backend': '后端（backend）',
+                'login': '登陆界面（login）',
+                'index': '主界面（index）',
+                'chat': '聊天界面（chat）',
+                'feedback': '反馈界面',
+                'unknown': '未知（unknown）',
+                'new': '建议和计划新增内容（new）'
+            };
+            return locations[location] || location;
+        }
+
+        // 格式化反馈时间
+        function formatFeedbackTime(timeString) {
+            if (!timeString) return '时间未知';
+            
+            // 解析时间字符串 YYYYMMDDHHmmss
+            const year = timeString.substring(0, 4);
+            const month = timeString.substring(4, 6);
+            const day = timeString.substring(6, 8);
+            const hour = timeString.substring(8, 10);
+            const minute = timeString.substring(10, 12);
+            
+            return `${year}-${month}-${day} ${hour}:${minute}`;
+        }
+
+        // 转义HTML特殊字符
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // 提交反馈
+        function submitFeedback() {
+            const type = document.getElementById('feedback-type').value;
+            const location = document.getElementById('feedback-location').value;
+            const content = document.getElementById('feedback-content').value.trim();
+
+            // 检查内容
+            if (!content) {
+                showFeedbackMessage('请填写反馈内容', 'error');
+                return;
+            }
+
+            const feedbackData = {
+                type: type,
+                location: location,
+                content: content
+            };
+
+            fetch('/api/feedback/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': sessionStorage.getItem('chat-user')
+                },
+                body: JSON.stringify(feedbackData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok) {
+                    showFeedbackMessage('反馈提交成功', 'success');
+                    document.getElementById('feedback-content').value = '';
+                    loadFeedbackList(); // 重新加载反馈列表
+                } else {
+                    showFeedbackMessage('反馈提交失败: ' + data.msg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFeedbackMessage('提交反馈时发生错误', 'error');
+            });
+        }
+
+        // 点赞反馈
+        function upvoteFeedback(feedbackId, button) {
+            // 检查当前是否已点赞
+            const isUpvoted = button.classList.contains('upvoted');
+            
+            const url = isUpvoted ? '/api/feedback/cancel-upvote' : '/api/feedback/upvote';
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': sessionStorage.getItem('chat-user')
+                },
+                body: JSON.stringify({ id: feedbackId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok) {
+                    // 更新点赞数
+                    const countElement = button.querySelector('.upvote-count');
+                    countElement.textContent = data.upvotes;
+                    
+                    // 切换点赞状态样式
+                    if (isUpvoted) {
+                        button.classList.remove('upvoted');
+                    } else {
+                        button.classList.add('upvoted');
+                    }
+                    
+                    // 更新本地数据
+                    updateLocalFeedbackData(feedbackId, data.upvotes, !isUpvoted);
+                    
+                    showFeedbackMessage(isUpvoted ? '已取消点赞' : '点赞成功', 'success');
+                } else {
+                    showFeedbackMessage('操作失败: ' + data.msg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFeedbackMessage('操作时发生错误', 'error');
+            });
+        }
+
+        // 更新本地反馈数据
+        function updateLocalFeedbackData(feedbackId, upvotes, isUpvoted) {
+            // 更新所有反馈数据
+            allFeedback = allFeedback.map(feedback => {
+                if (feedback.id === feedbackId) {
+                    return {
+                        ...feedback,
+                        upvotes: upvotes,
+                        userUpvoted: isUpvoted
+                    };
+                }
+                return feedback;
+            });
+            
+            // 更新筛选后的反馈数据
+            filteredFeedback = filteredFeedback.map(feedback => {
+                if (feedback.id === feedbackId) {
+                    return {
+                        ...feedback,
+                        upvotes: upvotes,
+                        userUpvoted: isUpvoted
+                    };
+                }
+                return feedback;
+            });
+        }
+
+        // 应用筛选
+        function applyFilter() {
+            const typeFilter = document.getElementById('filter-type').value;
+            const locationFilter = document.getElementById('filter-location').value;
+            
+            filteredFeedback = allFeedback.filter(feedback => {
+                // 类型筛选
+                if (typeFilter !== 'all' && feedback.type !== typeFilter) {
+                    return false;
+                }
+                
+                // 位置筛选
+                if (locationFilter !== 'all' && feedback.location !== locationFilter) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            displayFeedbackList(filteredFeedback);
+        }
+
+        // 重置筛选
+        function resetFilter() {
+            document.getElementById('filter-type').value = 'all';
+            document.getElementById('filter-location').value = 'all';
+            filteredFeedback = [...allFeedback];
+            displayFeedbackList(filteredFeedback);
+        }
+
+        // 显示反馈消息
+        function showFeedbackMessage(message, type) {
+            const messageElement = document.getElementById('feedback-message');
+            messageElement.textContent = message;
+            messageElement.className = 'feedback-message ' + type;
+            messageElement.style.display = 'block';
+
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 3000);
+        }
+
+        // 删除反馈
+        function deleteFeedback(feedbackId, button) {
+            // 确认删除
+            if (!confirm('确定要删除这条反馈吗？此操作不可恢复。')) {
+                return;
+            }
+            
+            fetch('/api/feedback/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': sessionStorage.getItem('chat-user')
+                },
+                body: JSON.stringify({ id: feedbackId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok) {
+                    showFeedbackMessage('反馈删除成功', 'success');
+                    // 重新加载反馈列表
+                    loadFeedbackList();
+                } else {
+                    showFeedbackMessage('删除失败: ' + data.msg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFeedbackMessage('删除反馈时发生错误', 'error');
+            });
+        }
+    </script>
+
+    <style>
+        .feedback-item {
+            text-align: left;
+            padding: 15px;
+        }
+        
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .feedback-id {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        
+        .feedback-type {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        
+        .feedback-type.bug {
+            background-color: rgba(255, 77, 79, 0.2);
+            color: #ff4d4f;
+        }
+        
+        .feedback-type.suggestion {
+            background-color: rgba(24, 144, 255, 0.2);
+            color: #1890ff;
+        }
+        
+        .feedback-type.plan {
+            background-color: rgba(47, 197, 119, 0.2);
+            color: #2fc577;
+        }
+        
+        .feedback-location {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+        
+        .feedback-time {
+            font-size: 0.8em;
+            margin-bottom: 5px;
+            opacity: 0.7;
+        }
+        
+        .feedback-author {
+            font-size: 0.8em;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+        
+        .feedback-content {
+            margin-bottom: 15px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        
+        .feedback-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .upvote-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        
+        .upvote-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.65);
+        }
+        
+        .upvote-btn.upvoted {
+            color: #ff4d4f;
+            border-color: rgba(255, 77, 79, 0.5);
+        }
+        
+        .theme-dark .upvote-btn.upvoted {
+            color: #ff6b6b;
+            border-color: rgba(255, 107, 107, 0.5);
+        }
+        
+        .upvote-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .theme-dark .upvote-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .delete-feedback-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            cursor: pointer;
+            color: #ff4d4f;
+        }
+        
+        .delete-feedback-btn:hover {
+            background: rgba(255, 77, 79, 0.1);
+        }
+        
+        .no-feedback {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</body>
+</html>
