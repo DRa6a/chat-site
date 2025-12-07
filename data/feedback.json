@@ -1,3 +1,154 @@
 {
-    "feedback": []
+    "feedback": [
+        {
+            "id": "CB-backend-20251201200439-0001",
+            "type": "bug",
+            "location": "backend",
+            "time": "20251201200439",
+            "content": "中文字符处理问题，当用户名为中文(其他ASCII字符可能也有此问题)，index、chat页面基本功能失效，应为网页脚本无法处理字符或出错所至，消息无法存入数据库(chat、db)、data/user下好友例表文件增加中文名称用户后该用户名称以Unicode字符呈现（可能是无法读取的根本原因。该BUG非必要不会修，只使用英文名来暂时解决。（主要是难修，一动整个网页编码可能都要改^_^）",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CA-style-20251201201554-0002",
+            "type": "suggestion",
+            "location": "feedback",
+            "time": "20251201201554",
+            "content": "在一些浏览器上网页比例过小（多出现在手机浏览器）",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CB-backend-20251201202059-0003",
+            "type": "bug",
+            "location": "backend",
+            "time": "20251201202059",
+            "content": "严重隐私问题！提供的图片查看的链接和图片下载的链接可通过改变文件编号查看或下载他人聊天中的图片(fix:CP-backend-20251201202631-0004)",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-backend-20251201202631-0004",
+            "type": "plan",
+            "location": "backend",
+            "time": "20251201202631",
+            "content": "图片显示时验证当前会话信息，下载图片时生成唯一密钥进入剪切板（先备份原有内容），下载页面验证密钥，下载，恢复剪切板原有内容（另一方案采用显示由验证方式，chat页面下载，不跳转）",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CB-unknow-20251201203404-0005",
+            "type": "bug",
+            "location": "unknown",
+            "time": "20251201203404",
+            "content": "IOS端原生浏览器上一直把网页上滑会导至主题切换，设置按钮图标丢失，原因未知。",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-chat-20251201203715-0006",
+            "type": "plan",
+            "location": "chat",
+            "time": "202512012037",
+            "content": "记录音乐播放状态。防止网页刷新时音乐停止并重制，状态写入浏览器内存，改善为刷新停止，但保留播放进度，争取实现音乐不参与刷新，即改为服务器内部时件而非网页。",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-index-20251201204240-0007",
+            "type": "plan",
+            "location": "index",
+            "time": "202512012042",
+            "content": "在主页增加一个播放器，可续播聊天内音乐",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-chat-20251203085411-0008",
+            "type": "plan",
+            "location": "chat",
+            "time": "20251202030854",
+            "content": "增加上传文件选项，把文件消息增添为新文件类型，为常见几种文件绘制图标，文件消息基本外观包括图标、文件名、文件类型（有图标的可以没有），文件大小，文件支持打开预览和下载",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CA-chat-20251205057-0009",
+            "type": "suggestion",
+            "location": "chat",
+            "time": "20251205057",
+            "content": "将文件消息类型分为可修改文件和不可修改文件，减轻文件存储负担，该属性由发送方决定",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-login-2025120414296-0010",
+            "type": "plan",
+            "location": "login",
+            "time": "2025120414296",
+            "content": "1.增加防护本机质提升安全性。2.增加新用户申请功能，和密码强调检查（包括密码修改时）",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-chat-20251204203028-0011",
+            "type": "plan",
+            "location": "chat",
+            "time": "20251204203028",
+            "content": "修改聊天信息的渲染方式，从最后一条向上逐条加载，共加载32条，该数字可在设置中修改，用户向上滑时动态加载未显示内容，减少浏览器性能占用，同时已加载内容不用重新加载，保证页面流畅。",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CA-chat-20251204204742-0012",
+            "type": "suggestion",
+            "location": "chat",
+            "time": "20251204204742",
+            "content": "完成图片加载动画",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CA-log in-20251204204831-0013",
+            "type": "suggestion",
+            "location": "login",
+            "time": "20251204204831",
+            "content": "完成登录加载动画",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-backend-20251204205052-0014",
+            "type": "plan",
+            "location": "backend",
+            "time": "20251204205052",
+            "content": "文件储存系统，储存在files/文件夹下，chatdb记录结构为单独table记录文件名，文件类型编号，内存储存时文件名，唯一编号，（大小，配合CA-chat-202512032057-0009的是值可修改，为布尔值），聊天读取table内使用“File —唯一编号”引用。",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        },
+        {
+            "id": "CP-backend-20251205094036-0015",
+            "type": "plan",
+            "location": "backend",
+            "time": "20251205094036",
+            "content": "登陆一个网请求网易云音乐时加入一个VIP用户信息，避免VIP歌曲放不出来，如果找不到VIP用户，尝试到其他平台（免费）API",
+            "author": "DRa6a",
+            "upvotes": 0,
+            "upvoted_by": []
+        }
+    ]
 }
