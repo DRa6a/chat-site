@@ -127,8 +127,8 @@
                     <option value="unset">未设置</option>
                 </select>
             </div>
-            <div class="form-group filter-buttons">
-                <button id="reset-filter-btn" class="glass">
+            <div class="form-group">
+                <button id="reset-filter-btn" class="glass btn-block">
                     <i class="fas fa-redo"></i> 重置筛选
                 </button>
             </div>
@@ -286,7 +286,7 @@
                 const content = escapeHtml(feedback.content);
                 if (content.length > 50) {
                     feedbackHTML += `
-<div class="feedback-content collapsible" data-expanded="false"><span class="content-preview">${content.substring(0, 50)}<span class="ellipsis">...<a href="#" class="toggle-link">(展开)</a></span></span><span class="content-full" style="display: none;">${content}<span class="collapse-control"> <a href="#" class="toggle-link">(收起)</a></span></span></div>
+<div class="feedback-content collapsible" data-expanded="false"><span class="content-preview">${content.substring(0, 50)}<a href="#" class="toggle-link expand-link">展开<i class="fas fa-chevron-down small-icon"></i></a></span><span class="content-full" style="display: none;">${content}<span class="collapse-control"> <a href="#" class="toggle-link collapse-link">收起<i class="fas fa-chevron-up small-icon"></i></a></span></span></div>
 `;
                 } else {
                     feedbackHTML += `<div class="feedback-content">${content}</div>`;
@@ -300,7 +300,7 @@
 <div class="feedback-status ${feedback.status}">
 <strong>状态:</strong> ${getStatusDisplayName(feedback.status)}
 </div>
-<div class="feedback-status-note collapsible" data-expanded="false"><span class="content-preview">${statusNote.substring(0, 50)}<span class="ellipsis">...<a href="#" class="toggle-link">(展开)</a></span></span><span class="content-full" style="display: none;">${statusNote}<span class="collapse-control"> <a href="#" class="toggle-link">(收起)</a></span></span></div>
+<div class="feedback-status-note collapsible" data-expanded="false"><span class="content-preview">${statusNote.substring(0, 50)}<a href="#" class="toggle-link expand-link">展开<i class="fas fa-chevron-down small-icon"></i></a></span><span class="content-full" style="display: none;">${statusNote}<span class="collapse-control"> <a href="#" class="toggle-link collapse-link">收起<i class="fas fa-chevron-up small-icon"></i></a></span></span></div>
 `;
                     } else {
                         feedbackHTML += `
@@ -852,6 +852,29 @@ ${feedback.statusNote ? `<div class="feedback-status-note">${statusNote}</div>` 
             text-decoration: underline;
         }
 
+        .small-icon {
+            font-size: 0.8em;
+            margin-left: 3px;
+        }
+
+        .expand-link {
+            float: right;
+            color: #999;
+        }
+
+        .theme-dark .expand-link {
+            color: #aaa;
+        }
+
+        .collapse-link {
+            float: right;
+            color: #999;
+        }
+
+        .theme-dark .collapse-link {
+            color: #aaa;
+        }
+
         .collapse-control {
             white-space: nowrap;
         }
@@ -1003,6 +1026,17 @@ ${feedback.statusNote ? `<div class="feedback-status-note">${statusNote}</div>` 
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .center-button {
+            align-self: center;
         }
     </style>
 </body>

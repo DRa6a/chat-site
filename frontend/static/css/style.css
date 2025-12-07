@@ -732,6 +732,29 @@ input.glass::placeholder {
     text-decoration: underline;
 }
 
+.small-icon {
+    font-size: 0.8em;
+    margin-left: 3px;
+}
+
+.expand-link {
+    float: right;
+    color: #999;
+}
+
+.theme-dark .expand-link {
+    color: #aaa;
+}
+
+.collapse-link {
+    float: right;
+    color: #999;
+}
+
+.theme-dark .collapse-link {
+    color: #aaa;
+}
+
 .collapse-control {
     white-space: nowrap;
 }
@@ -927,9 +950,13 @@ select.glass:focus {
 
 .filter-buttons {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 12px;
     margin-top: 10px;
+}
+
+.center-button {
+    align-self: center;
 }
 
 .add-friend-container h3 {

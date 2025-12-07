@@ -851,11 +851,12 @@ def generate_feedback_id(feedback_type, location, time_str):
     
     type_code = type_codes.get(feedback_type, "CX")
     
-    # 获取当前同类型同位置的反馈数量，用于生成序号
+    # 获取当前同位置的反馈数量，用于生成序号（不区分类型）
     feedback_data = load_feedback()
     count = 1
     for item in feedback_data["feedback"]:
-        if item["type"] == feedback_type and item["location"] == location and item["time"].startswith(time_str[:8]):
+        # 不再检查类型，只检查位置和日期
+        if item["location"] == location and item["time"].startswith(time_str[:8]):
             count += 1
     
     # 格式化序号为4位数字
