@@ -690,6 +690,79 @@ input.glass::placeholder {
     color: #2fc577;
 }
 
+.feedback-content {
+    margin-bottom: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.collapsible {
+    margin-bottom: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.content-preview {
+    display: inline;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.content-full {
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.ellipsis {
+    white-space: nowrap;
+}
+
+.toggle-link {
+    color: #1890ff;
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.toggle-link:hover {
+    text-decoration: underline;
+}
+
+.collapse-control {
+    white-space: nowrap;
+}
+
+.feedback-status {
+    font-size: 0.9em;
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.feedback-status-note {
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    padding: 5px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.05);
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.collapsible .feedback-status-note {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.theme-dark .feedback-status-note {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
 .feedback-location {
     font-size: 0.9em;
     margin-bottom: 5px;
@@ -712,6 +785,49 @@ input.glass::placeholder {
     margin-bottom: 15px;
     line-height: 1.5;
     white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.collapsible {
+    position: relative;
+}
+
+.content-preview {
+    display: inline;
+}
+
+.content-full {
+    display: none;
+}
+
+.ellipsis {
+    white-space: nowrap;
+}
+
+.toggle-link {
+    color: #1890ff;
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.toggle-link:hover {
+    text-decoration: underline;
+}
+
+.collapse-control {
+    white-space: nowrap;
+}
+
+.feedback-status-note {
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    padding: 5px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.theme-dark .feedback-status-note {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .feedback-actions {
@@ -1679,7 +1795,7 @@ select.glass:focus {
     }
 }
 
-.delete-feedback-btn {
+.delete-feedback-btn, .set-status-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1690,20 +1806,20 @@ select.glass:focus {
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     cursor: pointer;
+}
+
+.delete-feedback-btn {
     color: #ff4d4f;
+}
+
+.set-status-btn {
+    color: #52c41a;
 }
 
 .delete-feedback-btn:hover {
     background: rgba(255, 77, 79, 0.1);
 }
 
-.no-feedback {
-    text-align: center;
-    padding: 20px;
-    opacity: 0.7;
-}
-
-.loading {
-    text-align: center;
-    padding: 20px;
+.set-status-btn:hover {
+    background: rgba(82, 196, 26, 0.1);
 }

@@ -936,11 +936,60 @@ def list_feedback():
     feedback_data = load_feedback()
     feedback_list = feedback_data["feedback"]
     
-    # 为每个反馈项添加用户是否已点赞的标记
+    # 为每个反馈项添加用户是否已点赞的标记和OP标记
     for feedback in feedback_list:
         feedback["userUpvoted"] = current_user in feedback["upvoted_by"]
+        feedback["isOP"] = is_op(current_user)
     
     return jsonify({'ok': True, 'feedback': feedback_list})
+
+@app.route('/api/feedback/set-status', methods=['POST'])
+def set_feedback_status():
+    """设置反馈状态"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 检查权限：只有OP可以设置反馈状态
+    if not is_op(current_user):
+        return jsonify({'ok': False, 'msg': '只有管理员可以设置反馈状态'}), 403
+    
+    # 获取参数
+    feedback_id = request.json.get('id', '')
+    status = request.json.get('status', '')
+    note = request.json.get('note', '')
+    
+    if not feedback_id:
+        return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
+    
+    # 验证状态值
+    valid_statuses = ['', 'completed', 'partial', 'alternative', 'impossible', 'failed']
+    if status not in valid_statuses:
+        return jsonify({'ok': False, 'msg': '无效的状态值'}), 400
+    
+    # 查找反馈项
+    feedback_data = load_feedback()
+    feedback_item = None
+    
+    for item in feedback_data["feedback"]:
+        if item["id"] == feedback_id:
+            feedback_item = item
+            break
+    
+    if not feedback_item:
+        return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
+    
+    # 更新状态和说明
+    feedback_item["status"] = status
+    feedback_item["statusNote"] = note
+    
+    # 保存数据
+    save_feedback(feedback_data)
+    
+    return jsonify({'ok': True, 'msg': '状态更新成功'})
 
 @app.route('/api/user/op-status', methods=['POST'])
 def check_op_status():
