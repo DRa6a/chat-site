@@ -46,179 +46,186 @@
     </script>
 </head>
 <body>
-<div class="zoom-container">
-    <div class="top-bar">
-        <a href="/" class="glass back-btn" title="返回好友列表">
-            <i class="fas fa-arrow-left"></i>
-        </a>
-        <div class="chat-header">
-            <h1 class="blue-text">与 <span id="peername">{{ friend }}</span> 聊天</h1>
-        </div>
-        <div class="top-btns">
-            <button id="chat-settings-btn" class="glass" title="聊天设置">
-                <i class="fas fa-ellipsis-h"></i>
-            </button>
-            <label class="glass-switch" title="切换主题">
-                <input type="checkbox" id="theme-cb">
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
-    <main class="chat-container">
-        <div id="chat-messages" class="messages-container glass"></div>
-        <div class="input-container glass">
-            <input type="text" id="message-input" placeholder="输入消息..." class="glass" />
-            <button id="send-btn" class="glass send-btn">发送</button>
-            <button id="more-btn" class="glass send-btn">
-                <i class="fas fa-plus"></i>
-            </button>
-        </div>
-
-        <!-- 更多功能面板 -->
-        <div id="more-panel" class="more-panel glass">
-            <div class="more-panel-content">
-                <button id="upload-image-btn" class="more-panel-btn">
-                    <i class="fas fa-image"></i>
-                    <span>发送图片</span>
+    <div class="zoom-container">
+        <div class="top-bar">
+            <a href="/" class="glass back-btn" title="返回好友列表">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="chat-header">
+                <h1 class="blue-text">与 <span id="peername">{{ friend }}</span> 聊天</h1>
+            </div>
+            <div class="top-btns">
+                <button id="chat-settings-btn" class="glass" title="聊天设置">
+                    <i class="fas fa-ellipsis-h"></i>
                 </button>
-                <button id="search-music-btn" class="more-panel-btn">
-                    <i class="fas fa-music"></i>
-                    <span>分享音乐</span>
-                </button>
+                <label class="glass-switch" title="切换主题">
+                    <input type="checkbox" id="theme-cb">
+                    <span class="slider"></span>
+                </label>
             </div>
         </div>
 
-        <!-- 音乐搜索模态框 -->
-        <div id="music-search-modal" class="modal">
-            <div class="modal-content glass music-search-modal">
-                <div class="modal-header">
-                    <h2>搜索音乐</h2>
-                    <span class="close-btn" id="close-music-search">&times;</span>
+        <main class="chat-container">
+            <div id="chat-messages" class="messages-container glass"></div>
+            <div class="input-container glass">
+                <input type="text" id="message-input" placeholder="输入消息..." class="glass" />
+                <button id="send-btn" class="glass send-btn">发送</button>
+                <button id="more-btn" class="glass send-btn">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            
+            <!-- 更多功能面板 -->
+            <div id="more-panel" class="more-panel glass">
+                <div class="more-panel-content">
+                    <button id="upload-image-btn" class="more-panel-btn">
+                        <i class="fas fa-image"></i>
+                        <span>发送图片</span>
+                    </button>
+                    <button id="search-music-btn" class="more-panel-btn">
+                        <i class="fas fa-music"></i>
+                        <span>分享音乐</span>
+                    </button>
                 </div>
-                <div class="music-search-form">
-                    <div class="input-group">
-                        <input type="text" id="music-search-input" placeholder="输入歌曲名或歌手名..." class="glass">
-                        <button id="music-search-btn" class="glass send-btn">
-                            <i class="fas fa-search"></i> 搜索
-                        </button>
+            </div>
+            
+            <!-- 音乐搜索模态框 -->
+            <div id="music-search-modal" class="modal">
+                <div class="modal-content glass music-search-modal">
+                    <div class="modal-header">
+                        <h2>搜索音乐</h2>
+                        <span class="close-btn" id="close-music-search">&times;</span>
+                    </div>
+                    <div class="music-search-form">
+                        <div class="input-group">
+                            <input type="text" id="music-search-input" placeholder="输入歌曲名或歌手名..." class="glass">
+                            <button id="music-search-btn" class="glass send-btn">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                        </div>
+                    </div>
+                    <div id="music-search-results" class="music-search-results">
+                        <!-- 搜索结果将在这里显示 -->
                     </div>
                 </div>
-                <div id="music-search-results" class="music-search-results">
-                    <!-- 搜索结果将在这里显示 -->
+            </div>
+        </main>
+
+        <!-- 文件上传隐藏输入框 -->
+        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+
+        <!-- 聊天设置模态框 -->
+        <div id="chat-settings-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>聊天设置</h2>
+                    <span class="close-btn" id="close-chat-settings">&times;</span>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-item">
+                        <button id="edit-nickname-btn" class="glass btn-block">
+                            <i class="fas fa-user-edit"></i> 修改好友昵称
+                        </button>
+                    </div>
+
+                    <div class="settings-item">
+                        <button id="clear-chat-btn" class="glass btn-block clear-btn">
+                            <i class="fas fa-trash-alt"></i> 清空聊天记录
+                        </button>
+                    </div>
+
+                    <div class="settings-item">
+                        <button id="delete-friend-btn" class="glass btn-block delete-btn">
+                            <i class="fas fa-user-times"></i> 删除好友
+                        </button>
+                    </div>
+                    
+                    <!-- 添加反馈入口 -->
+                    <div class="settings-item">
+                        <a href="/feedback" class="glass btn-block" style="text-decoration: none; display: block; text-align: center;">
+                            <i class="fas fa-comment-alt"></i> 意见反馈
+                        </a>
+                    </div>
+                    
+                    <!-- 页面大小调整设置 -->
+                    <div class="settings-item">
+                        <label for="font-size-slider">字体大小</label>
+                        <input type="range" id="font-size-slider" min="12" max="24" value="16" class="settings-slider">
+                        <span id="font-size-value">16px</span>
+                    </div>
+                    
+                    <!-- 页面缩放设置 -->
+                    <div class="settings-item">
+                        <label for="zoom-slider">页面缩放</label>
+                        <input type="range" id="zoom-slider" min="50" max="150" value="100" class="settings-slider">
+                        <span id="zoom-value">100%</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </main>
 
-    <!-- 文件上传隐藏输入框 -->
-    <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        <script src="/static/js/friends.js"></script>
+        <script>
+            // 聊天设置功能
+            document.addEventListener('DOMContentLoaded', function() {
+                const chatSettingsBtn = document.getElementById('chat-settings-btn');
+                const chatSettingsModal = document.getElementById('chat-settings-modal');
+                const closeChatSettings = document.getElementById('close-chat-settings');
+                const editNicknameBtn = document.getElementById('edit-nickname-btn');
+                const clearChatBtn = document.getElementById('clear-chat-btn');
+                const deleteFriendBtn = document.getElementById('delete-friend-btn');
+                const peerName = document.getElementById('peername').textContent;
 
-    <!-- 聊天设置模态框 -->
-    <div id="chat-settings-modal" class="modal">
-        <div class="modal-content glass">
-            <div class="modal-header">
-                <h2>聊天设置</h2>
-                <span class="close-btn" id="close-chat-settings">&times;</span>
-            </div>
+                // 打开设置模态框
+                chatSettingsBtn.addEventListener('click', function() {
+                    chatSettingsModal.style.display = 'block';
+                });
 
-            <div class="settings-section">
-                <div class="settings-item">
-                    <button id="edit-nickname-btn" class="glass btn-block">
-                        <i class="fas fa-user-edit"></i> 修改好友昵称
-                    </button>
-                </div>
+                // 关闭设置模态框的统一方法
+                function closeSettings() {
+                    chatSettingsModal.style.display = 'none';
+                }
 
-                <div class="settings-item">
-                    <button id="clear-chat-btn" class="glass btn-block clear-btn">
-                        <i class="fas fa-trash-alt"></i> 清空聊天记录
-                    </button>
-                </div>
+                // 绑定关闭事件
+                closeChatSettings.addEventListener('click', closeSettings);
 
-                <div class="settings-item">
-                    <button id="delete-friend-btn" class="glass btn-block delete-btn">
-                        <i class="fas fa-user-times"></i> 删除好友
-                    </button>
-                </div>
+                // 点击模态框外部关闭
+                window.addEventListener('click', function(event) {
+                    if (event.target === chatSettingsModal) {
+                        closeSettings();
+                    }
+                });
 
-                <!-- 页面大小调整设置 -->
-                <!-- <div class="settings-item"> -->
-                <!-- <label for="font-size-slider">字体大小</label> -->
-                <!-- <input type="range" id="font-size-slider" min="12" max="24" value="16" class="settings-slider"> -->
-                <!-- <span id="font-size-value">16px</span> -->
-                <!-- </div> -->
-
-                <!-- 页面缩放设置 -->
-                <!-- <div class="settings-item"> -->
-                <!-- <label for="zoom-slider">页面缩放</label> -->
-                <!-- <input type="range" id="zoom-slider" min="50" max="150" value="100" class="settings-slider"> -->
-                <!-- <span id="zoom-value">100%</span> -->
-                <!-- </div>  -->
-            </div>
-        </div>
-    </div>
-
-    <script src="/static/js/friends.js"></script>
-    <script>
-        // 聊天设置功能
-        document.addEventListener('DOMContentLoaded', function() {
-            const chatSettingsBtn = document.getElementById('chat-settings-btn');
-            const chatSettingsModal = document.getElementById('chat-settings-modal');
-            const closeChatSettings = document.getElementById('close-chat-settings');
-            const editNicknameBtn = document.getElementById('edit-nickname-btn');
-            const clearChatBtn = document.getElementById('clear-chat-btn');
-            const deleteFriendBtn = document.getElementById('delete-friend-btn');
-            const peerName = document.getElementById('peername').textContent;
-
-            // 打开设置模态框
-            chatSettingsBtn.addEventListener('click', function() {
-                chatSettingsModal.style.display = 'block';
-            });
-
-            // 关闭设置模态框的统一方法
-            function closeSettings() {
-                chatSettingsModal.style.display = 'none';
-            }
-
-            // 绑定关闭事件
-            closeChatSettings.addEventListener('click', closeSettings);
-
-            // 点击模态框外部关闭
-            window.addEventListener('click', function(event) {
-                if (event.target === chatSettingsModal) {
+                // 修改好友昵称
+                editNicknameBtn.addEventListener('click', function() {
+                    const newNickname = prompt('请输入新的昵称:', peerName);
+                    if (newNickname && newNickname.trim() !== '' && newNickname !== peerName) {
+                        // 这里应该调用后端API来保存昵称
+                        alert('功能开发中：修改好友昵称功能');
+                    }
                     closeSettings();
-                }
-            });
+                });
 
-            // 修改好友昵称
-            editNicknameBtn.addEventListener('click', function() {
-                const newNickname = prompt('请输入新的昵称:', peerName);
-                if (newNickname && newNickname.trim() !== '' && newNickname !== peerName) {
-                    // 这里应该调用后端API来保存昵称
-                    alert('功能开发中：修改好友昵称功能');
-                }
-                closeSettings();
-            });
+                // 清空聊天记录
+                clearChatBtn.addEventListener('click', function() {
+                    if (confirm('确定要清空与 ' + peerName + ' 的所有聊天记录吗？此操作不可恢复！')) {
+                        // 这里应该调用后端API来清空聊天记录
+                        alert('功能开发中：清空聊天记录功能');
+                    }
+                    closeSettings();
+                });
 
-            // 清空聊天记录
-            clearChatBtn.addEventListener('click', function() {
-                if (confirm('确定要清空与 ' + peerName + ' 的所有聊天记录吗？此操作不可恢复！')) {
-                    // 这里应该调用后端API来清空聊天记录
-                    alert('功能开发中：清空聊天记录功能');
-                }
-                closeSettings();
+                // 删除好友
+                deleteFriendBtn.addEventListener('click', function() {
+                    if (confirm('确定要删除好友 ' + peerName + ' 吗？')) {
+                        // 这里应该调用后端API来删除好友关系
+                        alert('功能开发中：删除好友功能');
+                    }
+                    closeSettings();
+                });
             });
-
-            // 删除好友
-            deleteFriendBtn.addEventListener('click', function() {
-                if (confirm('确定要删除好友 ' + peerName + ' 吗？')) {
-                    // 这里应该调用后端API来删除好友关系
-                    alert('功能开发中：删除好友功能');
-                }
-                closeSettings();
-            });
-        });
-    </script>
-</div>
+        </script>
+    </div>
 </body>
 </html>
