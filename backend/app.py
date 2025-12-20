@@ -9,6 +9,22 @@ import time
 import uuid
 import requests
 
+# 添加日志模块
+import logging
+import sys
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# 创建应用logger
+logger = logging.getLogger('chat_app')
+
 app = Flask(__name__,
             template_folder='../frontend',
             static_folder='../frontend/static')
@@ -17,40 +33,9 @@ app.config['SECRET_KEY'] = 'your-secret-key'
 # 初始化SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
 
-# 请求统计相关
-class RequestStatistics:
-    def __init__(self):
-        self.stats = {}
-        self.lock = threading.Lock()
-        self.last_print_time = time.time()
-        
-    def record_request(self, endpoint, status_code):
-        with self.lock:
-            key = f"{endpoint}:{status_code}"
-            if key not in self.stats:
-                self.stats[key] = 0
-            self.stats[key] += 1
-            
-            # 每30秒打印一次统计信息
-            current_time = time.time()
-            if current_time - self.last_print_time > 30:
-                self.print_statistics()
-                self.last_print_time = current_time
-                
-    def print_statistics(self):
-        if self.stats:
-            print("=== 请求统计 ===")
-            for key, count in self.stats.items():
-                print(f"  {key} - {count} 次")
-            print("===============")
-            # 重置统计
-            self.stats.clear()
-
-# 创建全局统计对象
-request_stats = RequestStatistics()
+# 移除了请求统计相关的代码
 
 # 自定义日志处理
-import logging
 from werkzeug.serving import WSGIRequestHandler
 
 # 保存原始日志方法
@@ -72,13 +57,7 @@ UPLOAD_FOLDER = ROOT / 'uploads'
 os.makedirs(FRIENDS_DIR, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 在每个路由后记录统计信息
-@app.after_request
-def after_request(response):
-    # 记录特定端点的请求统计（排除静态文件）
-    if not request.path.startswith('/static'):
-        request_stats.record_request(request.path, response.status_code)
-    return response
+# 移除了 @app.after_request 装饰器函数，不再记录请求统计
 
 def init_db():
     """初始化数据库"""
@@ -170,7 +149,7 @@ def load_chat_history(user1, user2):
         conn.close()
         return messages
     except Exception as e:
-        print(f"加载聊天历史时出错: {e}")
+        logger.error(f"加载聊天历史时出错: {e}")
         return []
 
 def save_chat_message(user1, user2, sender, content):
@@ -219,25 +198,32 @@ def save_chat_message(user1, user2, sender, content):
         # 通知发送方首页更新未读消息数（对于其他会话）
         socketio.emit('unread_update', {'recipient': sender}, room=sender)
         
+        # 记录消息发送日志
+        logger.info(f"用户 {sender} 向 {user2} 发送消息: {display_content[:50]}{'...' if len(display_content) > 50 else ''}")
+        
         return message_id
     except Exception as e:
-        print(f"保存到数据库时出错: {e}")
+        logger.error(f"保存到数据库时出错: {e}")
         return None
 
 @app.route('/')
 def index():
+    logger.info("访问主页")
     return render_template('index.html')
 
 @app.route('/login')
 def login_page():
+    logger.info("访问登录页面")
     return render_template('login.html')
 
 @app.route('/chat/<friend>')
 def chat_room(friend):
+    logger.info(f"访问与 {friend} 的聊天室")
     return render_template('chat.html', friend=friend)
 
 @app.route('/feedback')
 def feedback():
+    logger.info("访问反馈页面")
     return render_template('feedback.html')
 
 @app.route('/api/login', methods=['POST'])
@@ -246,16 +232,21 @@ def api_login():
     u = request.json.get('username', '').strip()
     p = request.json.get('password', '')
     if users.get(u) == p:
+        logger.info(f"用户 {u} 登录成功")
         return jsonify({'ok': True, 'username': u, 'password': p})  # 返回用户名和密码
+    logger.warning(f"用户 {u} 登录失败")
     return jsonify({'ok': False}), 401
 
 @app.route('/api/friends')
 def api_friends():
     u = request.args.get('u')
-    if not u: return jsonify([]), 401
+    if not u: 
+        logger.warning("获取好友列表失败：用户未登录")
+        return jsonify([]), 401
     f = FRIENDS_DIR / f"{u}.friends.json"
     if not f.exists():
         f.write_text(json.dumps([u]))
+    logger.info(f"用户 {u} 获取好友列表")
     return jsonify(json.loads(f.read_text()))
 
 @app.route('/api/change-username', methods=['POST'])
@@ -266,7 +257,9 @@ def api_change_username():
     if oldUsername in users and newUsername not in users:
         users[newUsername] = users.pop(oldUsername)
         save_users(users)
+        logger.info(f"用户 {oldUsername} 更改用户名为 {newUsername}")
         return jsonify({'ok': True})
+    logger.warning(f"用户 {oldUsername} 更改用户名失败")
     return jsonify({'ok': False}), 401
 
 @app.route('/api/change-password', methods=['POST'])
@@ -277,7 +270,9 @@ def api_change_password():
     if username in users:
         users[username] = newPassword
         save_users(users)
+        logger.info(f"用户 {username} 更改密码成功")
         return jsonify({'ok': True})
+    logger.warning(f"用户 {username} 更改密码失败")
     return jsonify({'ok': False}), 401
 
 @app.route('/api/add-friend', methods=['POST'])
@@ -288,14 +283,17 @@ def api_add_friend():
 
     # 验证当前用户是否存在
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法添加好友")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
 
     # 验证好友是否存在
     if friend_name not in users:
+        logger.warning(f"用户 {current_user} 尝试添加不存在的用户 {friend_name} 为好友")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
     # 不能添加自己为好友
     if friend_name == current_user:
+        logger.warning(f"用户 {current_user} 尝试添加自己为好友")
         return jsonify({'ok': False, 'msg': '不能添加自己为好友'}), 400
 
     # 读取当前用户的好友列表
@@ -315,6 +313,7 @@ def api_add_friend():
 
     # 检查是否已经是好友（当前用户视角）
     if friend_name in current_user_friends:
+        logger.warning(f"用户 {current_user} 和 {friend_name} 已经是好友")
         return jsonify({'ok': False, 'msg': '该用户已是好友'}), 400
 
     # 添加好友到当前用户列表
@@ -326,6 +325,7 @@ def api_add_friend():
         friend_friends.append(current_user)
         friend_friend_file.write_text(json.dumps(friend_friends, ensure_ascii=False, indent=4))
 
+    logger.info(f"用户 {current_user} 成功添加 {friend_name} 为好友")
     return jsonify({'ok': True, 'msg': '好友添加成功'})
 
 @app.route('/api/remove-friend', methods=['POST'])
@@ -337,10 +337,12 @@ def api_remove_friend():
 
     # 验证当前用户是否存在
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法删除好友")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
 
     # 验证好友是否存在
     if friend_name not in users:
+        logger.warning(f"用户 {current_user} 尝试删除不存在的用户 {friend_name}")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
     try:
@@ -368,8 +370,10 @@ def api_remove_friend():
             friend_friends.remove(current_user)
             friend_friend_file.write_text(json.dumps(friend_friends, ensure_ascii=False, indent=4))
 
+        logger.info(f"用户 {current_user} 成功删除好友 {friend_name}")
         return jsonify({'ok': True, 'msg': '好友删除成功'})
     except Exception as e:
+        logger.error(f"删除好友失败: {e}")
         return jsonify({'ok': False, 'msg': '删除好友失败'}), 500
 
 @app.route('/api/send-message', methods=['POST'])
@@ -382,12 +386,15 @@ def api_send_message():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法发送消息")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     if recipient not in users:
+        logger.warning(f"用户 {current_user} 尝试向不存在的用户 {recipient} 发送消息")
         return jsonify({'ok': False, 'msg': '接收用户不存在'}), 404
     
     if not content:
+        logger.warning(f"用户 {current_user} 尝试发送空消息")
         return jsonify({'ok': False, 'msg': '消息内容不能为空'}), 400
     
     # 保存消息到数据库
@@ -399,6 +406,7 @@ def api_send_message():
         socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
         return jsonify({'ok': True, 'msg': '消息发送成功', 'message_id': message_id})
     else:
+        logger.error(f"用户 {current_user} 发送消息失败")
         return jsonify({'ok': False, 'msg': '消息发送失败'}), 500
 
 @app.route('/api/chat-history')
@@ -410,13 +418,16 @@ def api_chat_history():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法获取聊天历史")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     if friend not in users:
+        logger.warning(f"用户 {current_user} 尝试获取与不存在的用户 {friend} 的聊天历史")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
     
     # 获取聊天历史
     history = load_chat_history(current_user, friend)
+    logger.info(f"用户 {current_user} 获取与 {friend} 的聊天历史，共 {len(history)} 条消息")
     return jsonify({'ok': True, 'history': history})
 
 @app.route('/api/clear-chat-history', methods=['POST'])
@@ -428,9 +439,11 @@ def api_clear_chat_history():
 
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法清空聊天记录")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
 
     if friend_name not in users:
+        logger.warning(f"用户 {current_user} 尝试清空与不存在的用户 {friend_name} 的聊天记录")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
     try:
@@ -454,8 +467,9 @@ def api_clear_chat_history():
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
+                    logger.info(f"删除图片文件: {file_path}")
                 except Exception as e:
-                    print(f"删除图片文件失败 {file_path}: {e}")
+                    logger.error(f"删除图片文件失败 {file_path}: {e}")
         
         # 删除两个用户之间的所有消息记录
         cursor.execute('''
@@ -478,9 +492,10 @@ def api_clear_chat_history():
         conn.commit()
         conn.close()
         
+        logger.info(f"用户 {current_user} 清空与 {friend_name} 的聊天记录")
         return jsonify({'ok': True, 'msg': '聊天记录已清空'})
     except Exception as e:
-        print(f"清空聊天记录失败: {e}")  # 添加详细的错误日志
+        logger.error(f"清空聊天记录失败: {e}")  # 添加详细的错误日志
         return jsonify({'ok': False, 'msg': f'清空聊天记录失败: {str(e)}'}), 500
 
 @app.route('/api/unread-messages')
@@ -491,6 +506,7 @@ def api_unread_messages():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法获取未读消息")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     unread_counts = {}
@@ -521,8 +537,9 @@ def api_unread_messages():
                 unread_counts[friend] = count
         
         conn.close()
+        logger.info(f"用户 {current_user} 获取未读消息统计")
     except Exception as e:
-        print(f"检查未读消息时出错: {e}")
+        logger.error(f"检查未读消息时出错: {e}")
         # 出错时返回空的未读消息计数
         for friend in friends_list:
             if friend != current_user:
@@ -539,9 +556,11 @@ def api_mark_messages_as_read():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法标记消息为已读")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     if friend not in users:
+        logger.warning(f"用户 {current_user} 尝试标记与不存在的用户 {friend} 的消息为已读")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
     
     try:
@@ -573,9 +592,10 @@ def api_mark_messages_as_read():
         socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
         socketio.emit('unread_update', {'recipient': friend}, room=friend)
         
+        logger.info(f"用户 {current_user} 标记与 {friend} 的 {len(unread_message_ids)} 条消息为已读")
         return jsonify({'ok': True, 'marked_count': len(unread_message_ids)})
     except Exception as e:
-        print(f"标记消息为已读时出错: {e}")
+        logger.error(f"标记消息为已读时出错: {e}")
         return jsonify({'ok': False, 'msg': '标记消息为已读失败'}), 500
 
 @app.route('/api/upload-image', methods=['POST'])
@@ -586,13 +606,16 @@ def upload_image():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法上传图片")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     if 'image' not in request.files:
+        logger.warning(f"用户 {current_user} 上传图片失败：没有上传文件")
         return jsonify({'ok': False, 'msg': '没有上传文件'}), 400
     
     image_file = request.files['image']
     if image_file.filename == '':
+        logger.warning(f"用户 {current_user} 上传图片失败：文件名为空")
         return jsonify({'ok': False, 'msg': '文件名为空'}), 400
     
     if image_file:
@@ -620,14 +643,16 @@ def upload_image():
             conn.commit()
             conn.close()
             
+            logger.info(f"用户 {current_user} 上传图片成功: {image_file.filename}")
             return jsonify({'ok': True, 'image_id': image_id, 'msg': '图片上传成功'})
         except Exception as e:
             # 如果保存数据库失败，删除已上传的文件
             if 'file_path' in locals() and os.path.exists(file_path):
                 os.remove(file_path)
-            print(f"保存图片信息到数据库时出错: {e}")
+            logger.error(f"保存图片信息到数据库时出错: {e}")
             return jsonify({'ok': False, 'msg': f'上传失败: {str(e)}'}), 500
     
+    logger.warning(f"用户 {current_user} 上传图片失败")
     return jsonify({'ok': False, 'msg': '上传失败'}), 500
 
 @app.route('/api/get-image/<int:image_id>')
@@ -642,6 +667,7 @@ def get_image(image_id):
             # 这样前端可以直接在图片URL中传递用户信息
             current_user = request.args.get('user')
             if current_user not in users:
+                logger.warning(f"用户未登录，无法获取图片 {image_id}")
                 return jsonify({'ok': False, 'msg': '用户未登录'}), 401
             
         conn = sqlite3.connect(DB_FILE)
@@ -659,16 +685,19 @@ def get_image(image_id):
                 file_path = UPLOAD_FOLDER / filename
                 if os.path.exists(file_path):
                     conn.close()
+                    logger.info(f"用户 {current_user} 获取图片 {image_id}")
                     return send_from_directory(UPLOAD_FOLDER, filename)
             
             conn.close()
+            logger.warning(f"用户 {current_user} 无权限查看图片 {image_id}")
             # 对于没有权限的情况，我们仍然返回403错误
             return jsonify({'ok': False, 'msg': '您没有权限查看此图片'}), 403
         
         conn.close()
+        logger.warning(f"用户 {current_user} 尝试获取不存在的图片 {image_id}")
         return jsonify({'ok': False, 'msg': '图片不存在'}), 404
     except Exception as e:
-        print(f"获取图片时出错: {e}")
+        logger.error(f"获取图片时出错: {e}")
         return jsonify({'ok': False, 'msg': '获取图片失败'}), 500
 
 @app.route('/api/music/search')
@@ -678,6 +707,7 @@ def music_search():
     limit = request.args.get('limit', '30')
     
     if not keyword:
+        logger.warning("音乐搜索失败：关键词为空")
         return jsonify({'ok': False, 'msg': '搜索关键词不能为空'}), 400
     
     try:
@@ -726,11 +756,13 @@ def music_search():
                     'isVip': is_vip  # 添加VIP标识
                 })
             
+            logger.info(f"音乐搜索成功：关键词 '{keyword}'，返回 {len(songs)} 首歌曲")
             return jsonify({'ok': True, 'songs': songs})
         else:
+            logger.error(f"音乐搜索失败：API返回错误码 {data.get('code')}")
             return jsonify({'ok': False, 'msg': '搜索失败'}), 500
     except Exception as e:
-        print(f"音乐搜索出错: {e}")
+        logger.error(f"音乐搜索出错: {e}")
         return jsonify({'ok': False, 'msg': f'搜索出错: {str(e)}'}), 500
 
 @app.route('/api/music/detail')
@@ -739,6 +771,7 @@ def music_detail():
     music_id = request.args.get('id', '')
     
     if not music_id:
+        logger.warning("获取音乐详情失败：音乐ID为空")
         return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
     
     try:
@@ -772,11 +805,13 @@ def music_detail():
                 'duration': song.get('duration', 0)
             }
             
+            logger.info(f"获取音乐详情成功：音乐ID {music_id}")
             return jsonify({'ok': True, 'music': music_info})
         else:
+            logger.error(f"获取音乐详情失败：API返回错误码 {data.get('code')}")
             return jsonify({'ok': False, 'msg': '获取音乐详情失败'}), 500
     except Exception as e:
-        print(f"获取音乐详情出错: {e}")
+        logger.error(f"获取音乐详情出错: {e}")
         return jsonify({'ok': False, 'msg': f'获取详情出错: {str(e)}'}), 500
 
 @app.route('/api/music/url')
@@ -785,14 +820,16 @@ def music_url():
     music_id = request.args.get('id', '')
     
     if not music_id:
+        logger.warning("获取音乐播放链接失败：音乐ID为空")
         return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
     
     try:
         # 使用网易云音乐API获取音乐播放链接
         url = f'https://music.163.com/song/media/outer/url?id={music_id}.mp3'
+        logger.info(f"获取音乐播放链接成功：音乐ID {music_id}")
         return jsonify({'ok': True, 'url': url})
     except Exception as e:
-        print(f"获取音乐播放链接出错: {e}")
+        logger.error(f"获取音乐播放链接出错: {e}")
         return jsonify({'ok': False, 'msg': f'获取播放链接出错: {str(e)}'}), 500
 
 @app.route('/api/music/lyric')
@@ -801,6 +838,7 @@ def music_lyric():
     music_id = request.args.get('id', '')
     
     if not music_id:
+        logger.warning("获取音乐歌词失败：音乐ID为空")
         return jsonify({'ok': False, 'msg': '音乐ID不能为空'}), 400
     
     try:
@@ -823,11 +861,13 @@ def music_lyric():
         
         if data.get('code') == 200:
             lyric = data.get('lrc', {}).get('lyric', '')
+            logger.info(f"获取音乐歌词成功：音乐ID {music_id}")
             return jsonify({'ok': True, 'lyric': lyric})
         else:
+            logger.error(f"获取歌词失败：API返回错误码 {data.get('code')}")
             return jsonify({'ok': False, 'msg': '获取歌词失败'}), 500
     except Exception as e:
-        print(f"获取歌词出错: {e}")
+        logger.error(f"获取歌词出错: {e}")
         return jsonify({'ok': False, 'msg': f'获取歌词出错: {str(e)}'}), 500
 
 # 反馈系统相关接口
@@ -891,6 +931,7 @@ def submit_feedback():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法提交反馈")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     try:
@@ -900,20 +941,25 @@ def submit_feedback():
         location = data.get('location', '')
         content = data.get('content', '').strip()
     except Exception as e:
+        logger.error(f"提交反馈时解析请求数据出错: {e}")
         return jsonify({'ok': False, 'msg': '请求数据格式错误'}), 400
     
     # 验证参数
     if not feedback_type or feedback_type not in ['bug', 'suggestion', 'plan']:
+        logger.warning(f"用户 {current_user} 提交反馈失败：反馈类型无效")
         return jsonify({'ok': False, 'msg': '反馈类型无效'}), 400
     
     if not location:
+        logger.warning(f"用户 {current_user} 提交反馈失败：反馈位置为空")
         return jsonify({'ok': False, 'msg': '反馈位置不能为空'}), 400
     
     if not content:
+        logger.warning(f"用户 {current_user} 提交反馈失败：反馈内容为空")
         return jsonify({'ok': False, 'msg': '反馈内容不能为空'}), 400
     
     # 检查权限：只有OP可以提交计划类型反馈
     if feedback_type == 'plan' and not is_op(current_user):
+        logger.warning(f"用户 {current_user} 无权限提交计划类型反馈")
         return jsonify({'ok': False, 'msg': '只有管理员可以提交计划类型的反馈'}), 403
     
     # 生成时间戳
@@ -940,6 +986,7 @@ def submit_feedback():
     feedback_data["feedback"].append(feedback_item)
     save_feedback(feedback_data)
     
+    logger.info(f"用户 {current_user} 提交反馈成功：类型 {feedback_type}，位置 {location}")
     return jsonify({'ok': True, 'msg': '反馈提交成功'})
 
 @app.route('/api/feedback/list')
@@ -950,6 +997,7 @@ def list_feedback():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法获取反馈列表")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     # 加载反馈数据
@@ -961,6 +1009,7 @@ def list_feedback():
         feedback["userUpvoted"] = current_user in feedback["upvoted_by"]
         feedback["isOP"] = is_op(current_user)
     
+    logger.info(f"用户 {current_user} 获取反馈列表，共 {len(feedback_list)} 条反馈")
     return jsonify({'ok': True, 'feedback': feedback_list})
 
 @app.route('/api/feedback/set-status', methods=['POST'])
@@ -971,10 +1020,12 @@ def set_feedback_status():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法设置反馈状态")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     # 检查权限：只有OP可以设置反馈状态
     if not is_op(current_user):
+        logger.warning(f"用户 {current_user} 无权限设置反馈状态")
         return jsonify({'ok': False, 'msg': '只有管理员可以设置反馈状态'}), 403
     
     # 获取参数
@@ -983,11 +1034,13 @@ def set_feedback_status():
     note = request.json.get('note', '')
     
     if not feedback_id:
+        logger.warning(f"用户 {current_user} 设置反馈状态失败：反馈ID为空")
         return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
     
     # 验证状态值
     valid_statuses = ['', 'completed', 'partial', 'alternative', 'impossible', 'failed']
     if status not in valid_statuses:
+        logger.warning(f"用户 {current_user} 设置反馈状态失败：无效的状态值")
         return jsonify({'ok': False, 'msg': '无效的状态值'}), 400
     
     # 查找反馈项
@@ -1000,6 +1053,7 @@ def set_feedback_status():
             break
     
     if not feedback_item:
+        logger.warning(f"用户 {current_user} 设置反馈状态失败：反馈不存在")
         return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
     
     # 更新状态和说明
@@ -1009,6 +1063,7 @@ def set_feedback_status():
     # 保存数据
     save_feedback(feedback_data)
     
+    logger.info(f"用户 {current_user} 设置反馈 {feedback_id} 状态为 {status}")
     return jsonify({'ok': True, 'msg': '状态更新成功'})
 
 @app.route('/api/user/op-status', methods=['POST'])
@@ -1018,9 +1073,11 @@ def check_op_status():
     username = data.get('username', '') if data else ''
     
     if not username:
+        logger.warning("检查OP状态失败：用户名为空")
         return jsonify({'ok': False, 'msg': '用户名不能为空'}), 400
     
     is_op_user = is_op(username)
+    logger.info(f"检查用户 {username} 是否为OP: {is_op_user}")
     return jsonify({'ok': True, 'isOP': is_op_user})
 
 @app.route('/api/feedback/upvote', methods=['POST'])
@@ -1031,12 +1088,14 @@ def upvote_feedback():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法点赞反馈")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     # 获取参数
     feedback_id = request.json.get('id', '')
     
     if not feedback_id:
+        logger.warning(f"用户 {current_user} 点赞反馈失败：反馈ID为空")
         return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
     
     # 查找反馈项
@@ -1048,10 +1107,12 @@ def upvote_feedback():
             break
     
     if not feedback_item:
+        logger.warning(f"用户 {current_user} 点赞反馈失败：反馈不存在")
         return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
     
     # 检查用户是否已经点赞
     if current_user in feedback_item["upvoted_by"]:
+        logger.warning(f"用户 {current_user} 已经点赞过反馈 {feedback_id}")
         return jsonify({'ok': False, 'msg': '您已经点赞过该反馈'}), 400
     
     # 添加点赞
@@ -1061,6 +1122,7 @@ def upvote_feedback():
     # 保存数据
     save_feedback(feedback_data)
     
+    logger.info(f"用户 {current_user} 点赞反馈 {feedback_id}")
     return jsonify({'ok': True, 'upvotes': feedback_item["upvotes"]})
 
 @app.route('/api/feedback/cancel-upvote', methods=['POST'])
@@ -1071,12 +1133,14 @@ def cancel_upvote_feedback():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法取消点赞反馈")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     # 获取参数
     feedback_id = request.json.get('id', '')
     
     if not feedback_id:
+        logger.warning(f"用户 {current_user} 取消点赞反馈失败：反馈ID为空")
         return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
     
     # 查找反馈项
@@ -1088,10 +1152,12 @@ def cancel_upvote_feedback():
             break
     
     if not feedback_item:
+        logger.warning(f"用户 {current_user} 取消点赞反馈失败：反馈不存在")
         return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
     
     # 检查用户是否已经点赞
     if current_user not in feedback_item["upvoted_by"]:
+        logger.warning(f"用户 {current_user} 尚未点赞反馈 {feedback_id}")
         return jsonify({'ok': False, 'msg': '您还没有点赞该反馈'}), 400
     
     # 取消点赞
@@ -1101,6 +1167,7 @@ def cancel_upvote_feedback():
     # 保存数据
     save_feedback(feedback_data)
     
+    logger.info(f"用户 {current_user} 取消点赞反馈 {feedback_id}")
     return jsonify({'ok': True, 'upvotes': feedback_item["upvotes"]})
 
 @app.route('/api/feedback/delete', methods=['POST'])
@@ -1111,12 +1178,14 @@ def delete_feedback():
     
     # 验证用户
     if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法删除反馈")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
     # 获取参数
     feedback_id = request.json.get('id', '')
     
     if not feedback_id:
+        logger.warning(f"用户 {current_user} 删除反馈失败：反馈ID为空")
         return jsonify({'ok': False, 'msg': '反馈ID不能为空'}), 400
     
     # 查找反馈项
@@ -1131,10 +1200,12 @@ def delete_feedback():
             break
     
     if not feedback_item:
+        logger.warning(f"用户 {current_user} 删除反馈失败：反馈不存在")
         return jsonify({'ok': False, 'msg': '反馈不存在'}), 404
     
     # 检查权限：只有反馈发送者或OP可以删除反馈
     if feedback_item["author"] != current_user and not is_op(current_user):
+        logger.warning(f"用户 {current_user} 无权限删除反馈 {feedback_id}")
         return jsonify({'ok': False, 'msg': '您没有权限删除该反馈'}), 403
     
     # 删除反馈
@@ -1143,6 +1214,7 @@ def delete_feedback():
     # 保存数据
     save_feedback(feedback_data)
     
+    logger.info(f"用户 {current_user} 删除反馈 {feedback_id}")
     return jsonify({'ok': True, 'msg': '反馈删除成功'})
 
 @app.route('/flowStatistics')
@@ -1160,6 +1232,7 @@ def on_join(data):
     join_room(room)
     # 同时加入自己的房间，用于接收未读消息更新
     join_room(username)
+    logger.info(f"用户 {username} 加入与 {friend} 的聊天室")
     emit('status', {'msg': f'{username}加入了聊天室'})
 
 @socketio.on('leave')
@@ -1170,6 +1243,7 @@ def on_leave(data):
     room = "_".join(sorted([username, friend]))
     leave_room(room)
     leave_room(username)
+    logger.info(f"用户 {username} 离开与 {friend} 的聊天室")
     emit('status', {'msg': f'{username}离开了聊天室'})
 
 @socketio.on('send_message')
@@ -1181,10 +1255,12 @@ def on_send_message(data):
     
     # 保存消息到数据库
     save_chat_message(sender, recipient, sender, content)
+    logger.info(f"通过WebSocket发送消息：{sender} -> {recipient}")
 
 if __name__ == '__main__':
     # 初始化数据库
     init_db()
+    logger.info("聊天应用正在启动...")
     # 启动服务器（包括WebSocket支持）
     socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
     # app.run(host='0.0.0.0', port=80, debug=True)
@@ -1212,5 +1288,5 @@ def is_user_involved_in_image_chat(current_user, image_id):
             
         return False
     except Exception as e:
-        print(f"检查用户聊天权限时出错: {e}")
+        logger.error(f"检查用户聊天权限时出错: {e}")
         return False
