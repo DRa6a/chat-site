@@ -13,12 +13,14 @@
         {
             "id": "CA-style-20251201201554-0002",
             "type": "suggestion",
-            "location": "feedback",
+            "location": "unknown",
             "time": "20251201201554",
             "content": "在一些浏览器上网页比例过小（多出现在手机浏览器）",
             "author": "DRa6a",
             "upvotes": 0,
-            "upvoted_by": []
+            "upvoted_by": [],
+            "status": "completed",
+            "statusNote": "已通过添加viewport meta标签修复该问题，现在在移动设备上页面会正确缩放显示。"
         },
         {
             "id": "CB-backend-20251201202059-0003",
