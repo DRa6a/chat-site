@@ -634,19 +634,38 @@ def upload_image():
 def get_image(image_id):
     """获取图片"""
     try:
+        # 首先验证用户是否已登录
+        users = load_users()
+        current_user = request.headers.get('X-User')
+        if current_user not in users:
+            # 为了向后兼容，我们允许通过查询参数进行身份验证
+            # 这样前端可以直接在图片URL中传递用户信息
+            current_user = request.args.get('user')
+            if current_user not in users:
+                return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+            
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT filename FROM images WHERE id = ?', (image_id,))
+        # 获取图片信息，包括上传者
+        cursor.execute('SELECT filename, uploader FROM images WHERE id = ?', (image_id,))
         result = cursor.fetchone()
-        conn.close()
         
         if result:
-            filename = result[0]
-            file_path = UPLOAD_FOLDER / filename
-            if os.path.exists(file_path):
-                return send_from_directory(UPLOAD_FOLDER, filename)
+            filename, uploader = result
+            # 检查当前用户是否有权限访问这张图片
+            # 用户可以访问自己上传的图片，或者与自己有聊天记录的图片
+            if current_user == uploader or is_user_involved_in_image_chat(current_user, image_id):
+                file_path = UPLOAD_FOLDER / filename
+                if os.path.exists(file_path):
+                    conn.close()
+                    return send_from_directory(UPLOAD_FOLDER, filename)
+            
+            conn.close()
+            # 对于没有权限的情况，我们仍然返回403错误
+            return jsonify({'ok': False, 'msg': '您没有权限查看此图片'}), 403
         
+        conn.close()
         return jsonify({'ok': False, 'msg': '图片不存在'}), 404
     except Exception as e:
         print(f"获取图片时出错: {e}")
@@ -1169,3 +1188,29 @@ if __name__ == '__main__':
     # 启动服务器（包括WebSocket支持）
     socketio.run(app, host='0.0.0.0', port=80, debug=True, allow_unsafe_werkzeug=True)
     # app.run(host='0.0.0.0', port=80, debug=True)
+
+def is_user_involved_in_image_chat(current_user, image_id):
+    """检查用户是否参与了包含该图片的聊天"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 查找包含该图片的消息
+        cursor.execute('''
+            SELECT sender, recipient 
+            FROM messages 
+            WHERE content = ?
+        ''', (f"Pic_{image_id}",))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            sender, recipient = result
+            # 如果用户是发送者或接收者，则有权查看图片
+            return current_user == sender or current_user == recipient
+            
+        return False
+    except Exception as e:
+        print(f"检查用户聊天权限时出错: {e}")
+        return False
