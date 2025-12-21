@@ -422,19 +422,18 @@ input.glass::placeholder {
     margin: 5px 0;
 }
 
-.changelog h4 {
-    margin-top: 10px;
-    margin-bottom: 10px;
+/* GitHub链接样式 */
+.about-section a[href*='github.com'] {
+    color: #0078ff; /* 蓝色 */
+    text-decoration: none;
 }
 
-.changelog ul {
-    margin-top: 0;
-    padding-left: 20px;
+.about-section a[href*='github.com']:hover {
+    color: #00c6ff; /* 更亮的蓝色 */
+    text-decoration: underline;
 }
 
-.changelog li {
-    margin-bottom: 5px;
-}
+
 
 /* 输入组 */
 .input-group {

@@ -105,36 +105,11 @@
             </div>
 
             <div class="settings-section">
-                <div class="settings-item">
-                    <button id="edit-nickname-btn" class="glass btn-block">
-                        <i class="fas fa-user-edit"></i> 修改好友昵称
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <button id="clear-chat-btn" class="glass btn-block clear-btn">
-                        <i class="fas fa-trash-alt"></i> 清空聊天记录
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <button id="delete-friend-btn" class="glass btn-block delete-btn">
-                        <i class="fas fa-user-times"></i> 删除好友
-                    </button>
-                </div>
-                
                 <!-- 添加反馈入口 -->
                 <div class="settings-item">
-                    <a href="/feedback" class="glass btn-block" style="text-decoration: none; display: block; text-align: center;">
+                    <button id="feedback-btn" class="glass btn-block">
                         <i class="fas fa-comment-alt"></i> 意见反馈
-                    </a>
-                </div>
-                
-                <!-- 页面大小调整设置 -->
-                <div class="settings-item">
-                    <label for="font-size-slider">字体大小</label>
-                    <input type="range" id="font-size-slider" min="12" max="24" value="16" class="settings-slider">
-                    <span id="font-size-value">16px</span>
+                    </button>
                 </div>
             </div>
 
@@ -143,29 +118,6 @@
                 <div class="about-section">
                     <p><strong>版本:</strong> v1.2.0</p>
                     <p><strong>项目地址:</strong> <a href="https://github.com/DRa6a/chat-site" target="_blank" rel="noopener noreferrer"><i class="fab fa-github"></i> GitHub</a></p>
-                    <div class="changelog">
-                        <h4>更新日志:</h4>
-                        <ul>
-                            <li>实现基本的聊天功能</li>
-                            <li>添加好友管理功能</li>
-                            <li>实现深色/浅色主题切换</li>
-                            <li>解决主题切换时的页面闪烁问题</li>
-                            <li>优化UI界面和交互体验</li>
-                            <li>实现未读消息提示功能</li>
-                            <li>集成WebSocket实现实时通信</li>
-                            <li>移除过时的JSON文件存储机制</li>
-                            <li>支持多标签页独立登录</li>
-                            <li>优化日志输出，合并统计信息显示，保持高频轮询确保消息实时性</li>
-                            <li>优化聊天页面设置功能，移除冗余取消按钮</li>
-                            <li>修复夸克浏览器兼容性问题</li>
-                            <li>优化聊天消息时间显示逻辑，减少时间戳冗余显示</li>
-                            <li>修复发送消息重复显示问题</li>
-                            <li>完善退出聊天界面时未读消息状态更新机制</li>
-                            <li>集成网易云音乐API，支持音乐搜索和分享功能</li>
-                            <li>优化音乐播放器UI，添加进度条和时间显示</li>
-                            <li>添加反馈系统，支持BUG报告、意见反馈和计划提议</li>
-                        </ul>
-                    </div>
                 </div>
             </div>
 

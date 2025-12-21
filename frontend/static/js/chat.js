@@ -16,6 +16,12 @@ document.getElementById('close-settings').addEventListener('click', () => {
     document.getElementById('settings-modal').style.display = 'none';
 });
 
+// 意见反馈按钮点击事件
+document.getElementById('feedback-btn').addEventListener('click', () => {
+    // 跳转到意见反馈页面
+    location.href = '/feedback';
+});
+
 // 退出登录按钮点击事件（模态框按钮）
 document.getElementById('logout-btn').addEventListener('click', () => {
     if (confirm('确定要退出登录吗？')) {
@@ -331,31 +337,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 修改好友昵称
-    editNicknameBtn.addEventListener('click', function() {
-        const newNickname = prompt('请输入新的昵称:', peerName);
-        if (newNickname && newNickname.trim() !== '' && newNickname !== peerName) {
-            // 这里应该调用后端API来保存昵称
-            alert('功能开发中：修改好友昵称功能');
-        }
-        closeSettings();
-    });
 
-    // 清空聊天记录
-    clearChatBtn.addEventListener('click', function() {
-        if (confirm('确定要清空与 ' + peerName + ' 的所有聊天记录吗？此操作不可恢复！')) {
-            // 这里应该调用后端API来清空聊天记录
-            alert('功能开发中：清空聊天记录功能');
-        }
-        closeSettings();
-    });
-
-    // 删除好友
-    deleteFriendBtn.addEventListener('click', function() {
-        if (confirm('确定要删除好友 ' + peerName + ' 吗？')) {
-            // 这里应该调用后端API来删除好友关系
-            alert('功能开发中：删除好友功能');
-        }
-        closeSettings();
-    });
 });
