@@ -36,6 +36,47 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     }
 });
 
+// 主题切换功能
+function switchTheme(theme) {
+    const head = document.head;
+    const existingLink = document.querySelector('link[href*="style-pink"]');
+    
+    try {
+        // 保存用户选择的主题到localStorage
+        localStorage.setItem('selected-theme', theme);
+    } catch(e) {
+        console.log('无法访问localStorage:', e);
+    }
+    
+    if (theme === 'pink') {
+        // 如果已经引入了粉色主题，则不做任何操作
+        if (existingLink) return;
+        
+        // 否则创建新的link元素引入粉色主题
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/static/css/style-pink.css';
+        head.appendChild(link);
+    } else {
+        // 移除粉色主题
+        if (existingLink) {
+            existingLink.remove();
+        }
+    }
+}
+
+// 默认主题按钮点击事件
+document.getElementById('theme-default').addEventListener('click', () => {
+    switchTheme('default');
+    alert('已切换到默认主题');
+});
+
+// 粉色主题按钮点击事件
+document.getElementById('theme-pink').addEventListener('click', () => {
+    switchTheme('pink');
+    alert('已切换到粉色主题');
+});
+
 // 主题切换
 const themeCb = document.getElementById('theme-cb');
 const html = document.documentElement;
@@ -43,6 +84,12 @@ try {
     if (localStorage.getItem('theme') === 'dark') {
         html.classList.add('theme-dark');
         themeCb.checked = true;
+    }
+    
+    // 检查是否有保存的主题选择
+    const savedTheme = localStorage.getItem('selected-theme');
+    if (savedTheme === 'pink') {
+        switchTheme('pink');
     }
 } catch(e) {
     console.log('无法访问localStorage:', e);

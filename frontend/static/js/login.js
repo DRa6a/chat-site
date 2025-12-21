@@ -18,6 +18,35 @@ cb.addEventListener('change', e => {
     }
 });
 
+// 主题切换功能
+function switchTheme(theme) {
+    const head = document.head;
+    const existingLink = document.querySelector('link[href*="style-pink"]');
+    
+    try {
+        // 保存用户选择的主题到localStorage
+        localStorage.setItem('selected-theme', theme);
+    } catch(e) {
+        console.log('无法访问localStorage:', e);
+    }
+    
+    if (theme === 'pink') {
+        // 如果已经引入了粉色主题，则不做任何操作
+        if (existingLink) return;
+        
+        // 否则创建新的link元素引入粉色主题
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/static/css/style-pink.css';
+        head.appendChild(link);
+    } else {
+        // 移除粉色主题
+        if (existingLink) {
+            existingLink.remove();
+        }
+    }
+}
+
 function showFeedback(msg, type) {
     const fb = document.getElementById('feedback');
     fb.textContent = msg;
@@ -64,6 +93,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const theme = localStorage.getItem('theme');
         if (theme === 'dark') {
             document.documentElement.classList.add('theme-dark');
+        }
+        
+        // 检查保存的主题选择
+        const savedTheme = localStorage.getItem('selected-theme');
+        if (savedTheme === 'pink') {
+            switchTheme('pink');
         }
     } catch(e) {
         console.log('无法访问localStorage:', e);

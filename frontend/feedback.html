@@ -15,6 +15,15 @@
                 if (theme === 'dark') {
                     document.documentElement.classList.add('theme-dark');
                 }
+                
+                // 检查保存的主题选择
+                const savedTheme = localStorage.getItem('selected-theme');
+                if (savedTheme === 'pink') {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = '/static/css/style-pink.css';
+                    document.head.appendChild(link);
+                }
             } catch(e) {
                 console.log('无法访问localStorage:', e);
             }

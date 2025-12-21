@@ -742,15 +742,50 @@ class ChatApp {
     }
 
     loadTheme() {
-        const themeCb = document.getElementById('theme-cb');
         const html = document.documentElement;
         try {
+            // 加载深色/浅色主题
             if (localStorage.getItem('theme') === 'dark') {
                 html.classList.add('theme-dark');
-                themeCb.checked = true;
+                document.getElementById('theme-cb').checked = true;
+            }
+            
+            // 检查保存的主题选择
+            const savedTheme = localStorage.getItem('selected-theme');
+            if (savedTheme === 'pink') {
+                this.switchTheme('pink');
             }
         } catch(e) {
             console.log('无法访问localStorage:', e);
+        }
+    }
+
+    // 主题切换功能
+    switchTheme(theme) {
+        const head = document.head;
+        const existingLink = document.querySelector('link[href*="style-pink"]');
+        
+        try {
+            // 保存用户选择的主题到localStorage
+            localStorage.setItem('selected-theme', theme);
+        } catch(e) {
+            console.log('无法访问localStorage:', e);
+        }
+        
+        if (theme === 'pink') {
+            // 如果已经引入了粉色主题，则不做任何操作
+            if (existingLink) return;
+            
+            // 否则创建新的link元素引入粉色主题
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '/static/css/style-pink.css';
+            head.appendChild(link);
+        } else {
+            // 移除粉色主题
+            if (existingLink) {
+                existingLink.remove();
+            }
         }
     }
 
