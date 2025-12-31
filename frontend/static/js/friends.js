@@ -13,6 +13,7 @@ class ChatApp {
         this.lastMessageCount = 0;
         this.hasNewMessage = false;
         this.originalTitle = document.title;
+        this.isUnloading = false; // 标记页面是否正在卸载
 
         // 图片查看器相关属性
         this.imageMessages = []; // 存储所有图片消息
@@ -22,6 +23,11 @@ class ChatApp {
         this.currentAudio = null;
         this.currentPlayingButton = null;
         this.currentProgressInterval = null;
+
+        // 监听页面卸载事件
+        window.addEventListener('beforeunload', () => {
+            this.isUnloading = true;
+        });
 
         this.init();
     }
@@ -625,9 +631,17 @@ class ChatApp {
     // 关闭图片查看器
     closeImageViewer() {
         const imageViewerModal = document.getElementById('image-viewer-modal');
+        const viewerImage = document.getElementById('viewer-image');
+        
         if (imageViewerModal) {
             imageViewerModal.style.display = 'none';
             document.body.style.overflow = ''; // 恢复背景滚动
+        }
+        
+        // 释放blob URL以避免内存泄漏
+        if (viewerImage && viewerImage.src && viewerImage.src.startsWith('blob:')) {
+            URL.revokeObjectURL(viewerImage.src);
+            viewerImage.src = '';
         }
     }
 
@@ -653,6 +667,11 @@ class ChatApp {
         const currentImage = this.imageMessages[this.currentImageIndex];
         const viewerImage = document.getElementById('viewer-image');
         if (viewerImage) {
+            // 释放之前的blob URL以避免内存泄漏
+            if (viewerImage.src && viewerImage.src.startsWith('blob:')) {
+                URL.revokeObjectURL(viewerImage.src);
+            }
+            
             // 通过API获取图片数据
             try {
                 const response = await fetch(`/api/get-image/${currentImage.id}`, {
@@ -941,9 +960,14 @@ class ChatApp {
                 messageElement.style.alignSelf = 'flex-start';
             }
 
-            // 获取真实的图片数据
+            // 获取真实的图片数据并返回Promise
             const loadingElement = messageElement.querySelector('.image-loading');
-            this.loadImageData(imageId, loadingElement);
+            const imagePromise = this.loadImageData(imageId, loadingElement);
+            
+            container.appendChild(messageElement);
+            
+            // 返回图片加载Promise
+            return { element: messageElement, imagePromise: imagePromise };
         }
         // 检查是否是音乐消息
         else if (message.content.startsWith('Music_')) {
@@ -1019,6 +1043,11 @@ class ChatApp {
                 const musicArtist = lyricsBtn.getAttribute('data-music-artist');
                 this.showLyrics(musicId, musicTitle, musicArtist);
             });
+
+            container.appendChild(messageElement);
+            
+            // 返回统一结构
+            return { element: messageElement, imagePromise: Promise.resolve() };
         }
         else {
             // 文字消息使用气泡样式
@@ -1026,12 +1055,12 @@ class ChatApp {
             messageElement.innerHTML = `
                 <div class="message-content">${this.escapeHtml(message.content)}</div>
             `;
+            
+            container.appendChild(messageElement);
+            
+            // 返回统一结构
+            return { element: messageElement, imagePromise: Promise.resolve() };
         }
-
-        container.appendChild(messageElement);
-
-        // 返回创建的元素，以便调用者可以进一步处理
-        return messageElement;
     }
 
     escapeHtml(text) {
@@ -1042,7 +1071,7 @@ class ChatApp {
 
     async loadChatHistory() {
         try {
-            const response = await fetch(`/api/chat-history?friend=${this.peer}`, {
+            const response = await fetch(`/api/chat-history?friend=${encodeURIComponent(this.peer)}`, {
                 headers: {
                     'X-User': this.me
                 }
@@ -1086,20 +1115,11 @@ class ChatApp {
                     }
 
                     // 添加消息到UI
-                    const messageElement = this.addMessageToUI(message, isOwnMessage);
+                    const messageResult = this.addMessageToUI(message, isOwnMessage);
 
                     // 如果是图片消息，将图片加载Promise添加到数组中
-                    if (message.content.startsWith('Pic_')) {
-                        const img = messageElement.querySelector('img');
-                        const imgPromise = new Promise((resolve) => {
-                            img.onload = () => {
-                                resolve();
-                            };
-                            img.onerror = () => {
-                                resolve(); // 即使加载失败也继续
-                            };
-                        });
-                        imagePromises.push(imgPromise);
+                    if (message.content.startsWith('Pic_') && messageResult.imagePromise) {
+                        imagePromises.push(messageResult.imagePromise);
                     }
                 });
 
@@ -1138,8 +1158,36 @@ class ChatApp {
 
     // 标记当前聊天消息为已读
     async markMessagesAsRead() {
+        // 检查页面是否正在卸载
+        if (this.isUnloading) {
+            console.warn('页面正在卸载，跳过标记消息为已读');
+            return;
+        }
+
+        // 检查用户是否已登录
+        if (!this.me) {
+            console.warn('用户未登录，跳过标记消息为已读');
+            return;
+        }
+
+        // 检查好友名称是否有效
+        if (!this.peer) {
+            console.warn('好友名称无效，跳过标记消息为已读');
+            return;
+        }
+
+        // 检查页面是否可见
+        if (!document.visibilityState || document.visibilityState === 'hidden') {
+            console.warn('页面不可见，跳过标记消息为已读');
+            return;
+        }
+
+        // 创建AbortController用于取消请求
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
         try {
-            await fetch('/api/mark-messages-as-read', {
+            const response = await fetch('/api/mark-messages-as-read', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1147,8 +1195,24 @@ class ChatApp {
                 },
                 body: JSON.stringify({
                     friend: this.peer
-                })
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`标记消息为已读失败: ${response.status} - ${errorText}`);
+                return;
+            }
+
+            const result = await response.json();
+            if (result.ok) {
+                console.log(`成功标记 ${result.marked_count} 条消息为已读`);
+            } else {
+                console.warn(`标记消息为已读失败: ${result.msg}`);
+            }
 
             // 通知首页更新未读消息计数
             try {
@@ -1157,14 +1221,20 @@ class ChatApp {
                 console.error('无法更新localStorage:', e);
             }
         } catch (error) {
-            console.error('标记消息为已读出错:', error);
+            clearTimeout(timeoutId);
+            // 如果是AbortError，说明请求被取消或超时，不需要显示错误
+            if (error.name === 'AbortError') {
+                console.warn('标记消息为已读请求被取消或超时');
+            } else {
+                console.error('标记消息为已读出错:', error);
+            }
         }
     }
 
     // 新增：轮询获取新消息
     async checkForNewMessages() {
         try {
-            const response = await fetch(`/api/chat-history?friend=${this.peer}`, {
+            const response = await fetch(`/api/chat-history?friend=${encodeURIComponent(this.peer)}`, {
                 headers: {
                     'X-User': this.me
                 }
@@ -1360,10 +1430,15 @@ class ChatApp {
     }
 
     destroy() {
+        // 设置卸载标记
+        this.isUnloading = true;
+        
         // 停止轮询
         this.stopPolling();
-        // 标记消息为已读
-        this.markMessagesAsRead();
+        
+        // 标记消息为已读（使用sendBeacon发送，不等待响应）
+        this.markMessagesAsReadOnDestroy();
+        
         // 关闭图片查看器
         this.closeImageViewer();
         // 关闭歌词查看器
@@ -1372,57 +1447,106 @@ class ChatApp {
         this.pauseMusic();
     }
 
-    // 获取图片真实数据
-    async loadImageData(imageId, loadingElement) {
+    // 在页面卸载时标记消息为已读（使用sendBeacon）
+    markMessagesAsReadOnDestroy() {
+        // 检查用户是否已登录
+        if (!this.me) {
+            return;
+        }
+
+        // 检查好友名称是否有效
+        if (!this.peer) {
+            return;
+        }
+
         try {
-            const response = await fetch(`/api/get-image/${imageId}`, {
-                headers: {
-                    'X-User': this.me
-                }
+            // 使用sendBeacon发送请求，不等待响应
+            // 由于sendBeacon不支持自定义请求头，我们需要将用户信息放在URL参数中
+            const data = JSON.stringify({
+                friend: this.peer,
+                user: this.me  // 在请求体中包含用户信息
             });
             
-            if (response.ok) {
-                // 获取图片的blob数据
-                const blob = await response.blob();
-                const imageUrl = URL.createObjectURL(blob);
-                
-                // 替换加载元素为实际图片
-                const img = document.createElement('img');
-                img.src = imageUrl;
-                img.alt = "图片";
-                img.style.maxWidth = "200px";
-                img.style.maxHeight = "200px";
-                img.style.borderRadius = "10px";
-                img.style.border = "1px solid rgba(0, 0, 0, 0.1)";
-                img.setAttribute('data-image-id', imageId);
-                
-                // 为图片添加点击事件，打开图片查看器
-                img.addEventListener('click', () => {
-                    this.openImageViewer(imageId, img);
-                });
-                
-                // 处理图片加载完成后的滚动
-                img.onload = () => {
-                    // 图片加载完成后重新滚动到底部
-                    this.scrollToBottom();
-                };
-                img.onerror = () => {
-                    // 图片加载失败时也确保滚动到底部
-                    this.scrollToBottom();
-                };
-                
-                // 替换加载元素
-                loadingElement.parentNode.replaceChild(img, loadingElement);
+            // 创建Blob对象
+            const blob = new Blob([data], { type: 'application/json' });
+            
+            // 使用sendBeacon发送请求
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon('/api/mark-messages-as-read', blob);
+                console.log('已使用sendBeacon发送标记消息为已读请求');
             } else {
-                // 处理错误情况
-                loadingElement.innerHTML = '<i class="fas fa-exclamation-circle" style="color: red; font-size: 24px;"></i>';
-                this.scrollToBottom();
+                // 如果不支持sendBeacon，尝试使用fetch但不等待响应
+                fetch('/api/mark-messages-as-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User': this.me
+                    },
+                    body: data,
+                    keepalive: true
+                }).catch(() => {
+                    // 忽略错误
+                });
             }
         } catch (error) {
-            console.error('加载图片失败:', error);
-            loadingElement.innerHTML = '<i class="fas fa-exclamation-circle" style="color: red; font-size: 24px;"></i>';
-            this.scrollToBottom();
+            // 忽略错误
         }
+    }
+
+    // 获取图片真实数据
+    async loadImageData(imageId, loadingElement) {
+        return new Promise((resolve) => {
+            try {
+                fetch(`/api/get-image/${imageId}`, {
+                    headers: {
+                        'X-User': this.me
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        return response.blob();
+                    } else {
+                        throw new Error('Failed to load image');
+                    }
+                }).then(blob => {
+                    const imageUrl = URL.createObjectURL(blob);
+                    
+                    // 替换加载元素为实际图片
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = "图片";
+                    img.style.maxWidth = "200px";
+                    img.style.maxHeight = "200px";
+                    img.style.borderRadius = "10px";
+                    img.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                    img.setAttribute('data-image-id', imageId);
+                    
+                    // 为图片添加点击事件，打开图片查看器
+                    img.addEventListener('click', () => {
+                        this.openImageViewer(imageId, img);
+                    });
+                    
+                    // 处理图片加载完成
+                    img.onload = () => {
+                        // 替换加载元素
+                        loadingElement.parentNode.replaceChild(img, loadingElement);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        // 图片加载失败
+                        loadingElement.innerHTML = '<i class="fas fa-exclamation-circle" style="color: red; font-size: 24px;"></i>';
+                        resolve();
+                    };
+                }).catch(error => {
+                    console.error('加载图片失败:', error);
+                    loadingElement.innerHTML = '<i class="fas fa-exclamation-circle" style="color: red; font-size: 24px;"></i>';
+                    resolve();
+                });
+            } catch (error) {
+                console.error('加载图片失败:', error);
+                loadingElement.innerHTML = '<i class="fas fa-exclamation-circle" style="color: red; font-size: 24px;"></i>';
+                resolve();
+            }
+        });
     }
 }
 

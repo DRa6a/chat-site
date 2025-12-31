@@ -1,6 +1,7 @@
 import sqlite3
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask_wtf.csrf import CSRFProtect
 import json, pathlib, os
 from datetime import datetime
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -8,6 +9,7 @@ import threading
 import time
 import uuid
 import requests
+import bcrypt
 
 # 添加日志模块
 import logging
@@ -28,7 +30,11 @@ logger = logging.getLogger('chat_app')
 app = Flask(__name__,
             template_folder='../frontend',
             static_folder='../frontend/static')
-app.config['SECRET_KEY'] = 'your-secret-key'
+# 使用环境变量管理SECRET_KEY，提供默认值
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# 初始化CSRF保护
+csrf = CSRFProtect(app)
 
 # 初始化SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
@@ -117,19 +123,59 @@ def save_users(users):
     with open(USER_FILE, 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
-def load_chat_history(user1, user2):
-    """加载两个用户之间的聊天记录"""
+def hash_password(password):
+    """使用bcrypt哈希密码"""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+def verify_password(password, hashed_password):
+    """验证密码是否匹配"""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
+
+def migrate_passwords_to_hash():
+    """迁移现有明文密码到哈希密码"""
+    users = load_users()
+    migrated = False
+    
+    for username, password in users.items():
+        # 检查密码是否已经是哈希格式（bcrypt哈希以$2b$开头）
+        if not password.startswith('$2b$'):
+            users[username] = hash_password(password)
+            migrated = True
+            logger.info(f"已迁移用户 {username} 的密码到哈希格式")
+    
+    if migrated:
+        save_users(users)
+        logger.info("密码迁移完成")
+    
+    return migrated
+
+def load_chat_history(user1, user2, limit=None, offset=0):
+    """加载两个用户之间的聊天记录，支持分页"""
     # 首先尝试从数据库加载
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        cursor.execute('''
+        # 构建基础查询
+        query = '''
             SELECT id, sender, content, timestamp 
             FROM messages 
             WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
             ORDER BY timestamp ASC
-        ''', (user1, user2, user2, user1))
+        '''
+        
+        # 添加分页参数
+        params = (user1, user2, user2, user1)
+        if limit is not None:
+            query += ' LIMIT ? OFFSET ?'
+            params = params + (limit, offset)
+        
+        cursor.execute(query, params)
         
         messages = []
         for row in cursor.fetchall():
@@ -206,6 +252,68 @@ def save_chat_message(user1, user2, sender, content):
         logger.error(f"保存到数据库时出错: {e}")
         return None
 
+def add_friendship_db(user1, user2):
+    """在数据库中添加好友关系"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 检查是否已经是好友
+        cursor.execute('''
+            SELECT COUNT(*) FROM friendships
+            WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+        ''', (user1, user2, user2, user1))
+        
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO friendships (user1, user2, timestamp)
+                VALUES (?, ?, ?)
+            ''', (user1, user2, datetime.now().isoformat()))
+            conn.commit()
+        
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"添加好友关系到数据库时出错: {e}")
+        return False
+
+def remove_friendship_db(user1, user2):
+    """从数据库中删除好友关系"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM friendships
+            WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+        ''', (user1, user2, user2, user1))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"删除好友关系时出错: {e}")
+        return False
+
+def get_friends_db(user):
+    """从数据库中获取用户的好友列表"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT CASE WHEN user1 = ? THEN user2 ELSE user1 END as friend
+            FROM friendships
+            WHERE user1 = ? OR user2 = ?
+        ''', (user, user, user))
+        
+        friends = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return friends
+    except Exception as e:
+        logger.error(f"获取好友列表时出错: {e}")
+        return []
+
 @app.route('/')
 def index():
     logger.info("访问主页")
@@ -231,11 +339,26 @@ def api_login():
     users = load_users()
     u = request.json.get('username', '').strip()
     p = request.json.get('password', '')
-    if users.get(u) == p:
-        logger.info(f"用户 {u} 登录成功")
-        return jsonify({'ok': True, 'username': u, 'password': p})  # 返回用户名和密码
-    logger.warning(f"用户 {u} 登录失败")
-    return jsonify({'ok': False}), 401
+    if u not in users:
+        logger.warning(f"用户 {u} 登录失败：用户不存在")
+        return jsonify({'ok': False}), 401
+    
+    stored_password = users[u]
+    # 检查密码是否已经是哈希格式
+    if stored_password.startswith('$2b$'):
+        if verify_password(p, stored_password):
+            logger.info(f"用户 {u} 登录成功")
+            return jsonify({'ok': True, 'username': u})
+        else:
+            logger.warning(f"用户 {u} 登录失败：密码错误")
+            return jsonify({'ok': False}), 401
+    else:
+        # 明文密码，用于向后兼容
+        if users.get(u) == p:
+            logger.info(f"用户 {u} 登录成功（明文密码）")
+            return jsonify({'ok': True, 'username': u})
+        logger.warning(f"用户 {u} 登录失败")
+        return jsonify({'ok': False}), 401
 
 @app.route('/api/friends')
 def api_friends():
@@ -243,11 +366,27 @@ def api_friends():
     if not u: 
         logger.warning("获取好友列表失败：用户未登录")
         return jsonify([]), 401
-    f = FRIENDS_DIR / f"{u}.friends.json"
-    if not f.exists():
-        f.write_text(json.dumps([u]))
+    
+    # 首先尝试从数据库获取好友列表
+    friends = get_friends_db(u)
+    
+    # 如果数据库中没有好友，尝试从JSON文件迁移
+    if not friends:
+        f = FRIENDS_DIR / f"{u}.friends.json"
+        if f.exists():
+            old_friends = json.loads(f.read_text())
+            # 迁移到数据库
+            for friend in old_friends:
+                if friend != u:  # 不添加自己
+                    add_friendship_db(u, friend)
+            friends = get_friends_db(u)
+    
+    # 如果仍然没有好友，至少返回自己
+    if not friends:
+        friends = [u]
+    
     logger.info(f"用户 {u} 获取好友列表")
-    return jsonify(json.loads(f.read_text()))
+    return jsonify(friends)
 
 @app.route('/api/change-username', methods=['POST'])
 def api_change_username():
@@ -268,7 +407,8 @@ def api_change_password():
     username = request.headers.get('X-User')
     newPassword = request.json.get('newPassword', '').strip()
     if username in users:
-        users[username] = newPassword
+        # 使用哈希存储新密码
+        users[username] = hash_password(newPassword)
         save_users(users)
         logger.info(f"用户 {username} 更改密码成功")
         return jsonify({'ok': True})
@@ -296,37 +436,19 @@ def api_add_friend():
         logger.warning(f"用户 {current_user} 尝试添加自己为好友")
         return jsonify({'ok': False, 'msg': '不能添加自己为好友'}), 400
 
-    # 读取当前用户的好友列表
-    friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
-    if friend_file.exists():
-        current_user_friends = json.loads(friend_file.read_text())
-    else:
-        current_user_friends = [current_user]
-
-    # 读取被添加用户的好友列表
-    friend_friend_file = FRIENDS_DIR / f"{friend_name}.friends.json"
-    if friend_friend_file.exists():
-        friend_friends = json.loads(friend_friend_file.read_text())
-    else:
-        # 新建好友列表时不包含自己
-        friend_friends = []
-
-    # 检查是否已经是好友（当前用户视角）
-    if friend_name in current_user_friends:
+    # 检查是否已经是好友
+    current_friends = get_friends_db(current_user)
+    if friend_name in current_friends:
         logger.warning(f"用户 {current_user} 和 {friend_name} 已经是好友")
         return jsonify({'ok': False, 'msg': '该用户已是好友'}), 400
 
-    # 添加好友到当前用户列表
-    current_user_friends.append(friend_name)
-    friend_file.write_text(json.dumps(current_user_friends, ensure_ascii=False, indent=4))
-    
-    # 添加当前用户到好友列表（实现双向好友关系）
-    if current_user not in friend_friends:
-        friend_friends.append(current_user)
-        friend_friend_file.write_text(json.dumps(friend_friends, ensure_ascii=False, indent=4))
-
-    logger.info(f"用户 {current_user} 成功添加 {friend_name} 为好友")
-    return jsonify({'ok': True, 'msg': '好友添加成功'})
+    # 添加好友关系到数据库（双向）
+    if add_friendship_db(current_user, friend_name):
+        logger.info(f"用户 {current_user} 成功添加 {friend_name} 为好友")
+        return jsonify({'ok': True, 'msg': '好友添加成功'})
+    else:
+        logger.error(f"用户 {current_user} 添加 {friend_name} 为好友失败")
+        return jsonify({'ok': False, 'msg': '添加好友失败'}), 500
 
 @app.route('/api/remove-friend', methods=['POST'])
 def api_remove_friend():
@@ -345,35 +467,12 @@ def api_remove_friend():
         logger.warning(f"用户 {current_user} 尝试删除不存在的用户 {friend_name}")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
-    try:
-        # 读取当前用户的好友列表
-        friend_file = FRIENDS_DIR / f"{current_user}.friends.json"
-        if friend_file.exists():
-            current_user_friends = json.loads(friend_file.read_text())
-        else:
-            current_user_friends = [current_user]
-
-        # 读取被删除用户的好友列表
-        friend_friend_file = FRIENDS_DIR / f"{friend_name}.friends.json"
-        if friend_friend_file.exists():
-            friend_friends = json.loads(friend_friend_file.read_text())
-        else:
-            friend_friends = [friend_name]
-
-        # 从当前用户好友列表中删除好友
-        if friend_name in current_user_friends:
-            current_user_friends.remove(friend_name)
-            friend_file.write_text(json.dumps(current_user_friends, ensure_ascii=False, indent=4))
-
-        # 从好友的好友列表中删除当前用户
-        if current_user in friend_friends:
-            friend_friends.remove(current_user)
-            friend_friend_file.write_text(json.dumps(friend_friends, ensure_ascii=False, indent=4))
-
+    # 从数据库中删除好友关系（双向）
+    if remove_friendship_db(current_user, friend_name):
         logger.info(f"用户 {current_user} 成功删除好友 {friend_name}")
         return jsonify({'ok': True, 'msg': '好友删除成功'})
-    except Exception as e:
-        logger.error(f"删除好友失败: {e}")
+    else:
+        logger.error(f"用户 {current_user} 删除好友 {friend_name} 失败")
         return jsonify({'ok': False, 'msg': '删除好友失败'}), 500
 
 @app.route('/api/send-message', methods=['POST'])
@@ -411,10 +510,14 @@ def api_send_message():
 
 @app.route('/api/chat-history')
 def api_chat_history():
-    """获取聊天历史API"""
+    """获取聊天历史API，支持分页"""
     users = load_users()
     current_user = request.headers.get('X-User')
     friend = request.args.get('friend', '').strip()
+    
+    # 获取分页参数
+    limit = request.args.get('limit', type=int)
+    offset = request.args.get('offset', 0, type=int)
     
     # 验证用户
     if current_user not in users:
@@ -426,7 +529,7 @@ def api_chat_history():
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
     
     # 获取聊天历史
-    history = load_chat_history(current_user, friend)
+    history = load_chat_history(current_user, friend, limit=limit, offset=offset)
     logger.info(f"用户 {current_user} 获取与 {friend} 的聊天历史，共 {len(history)} 条消息")
     return jsonify({'ok': True, 'history': history})
 
@@ -500,7 +603,7 @@ def api_clear_chat_history():
 
 @app.route('/api/unread-messages')
 def api_unread_messages():
-    """获取未读消息数量"""
+    """获取未读消息数量，使用单条SQL查询优化性能"""
     users = load_users()
     current_user = request.headers.get('X-User')
     
@@ -522,19 +625,31 @@ def api_unread_messages():
         else:
             friends_list = [current_user]
         
-        # 检查每个好友的聊天记录，统计未读消息
-        for friend in friends_list:
-            if friend != current_user:  # 不统计自己
-                # 查询来自好友且用户未读的消息数量
-                cursor.execute('''
-                    SELECT COUNT(*) 
-                    FROM messages m
-                    LEFT JOIN read_messages r ON m.id = r.message_id AND r.user = ?
-                    WHERE m.sender = ? AND m.recipient = ? AND r.message_id IS NULL
-                ''', (current_user, friend, current_user))
-                
-                count = cursor.fetchone()[0]
-                unread_counts[friend] = count
+        # 使用单条SQL查询所有好友的未读消息数
+        if friends_list:
+            # 构建好友列表占位符
+            placeholders = ','.join(['?' for _ in friends_list])
+            
+            # 查询来自所有好友且用户未读的消息数量
+            cursor.execute(f'''
+                SELECT m.sender, COUNT(*) as unread_count
+                FROM messages m
+                LEFT JOIN read_messages r ON m.id = r.message_id AND r.user = ?
+                WHERE m.sender IN ({placeholders}) 
+                  AND m.recipient = ? 
+                  AND r.message_id IS NULL
+                GROUP BY m.sender
+            ''', [current_user] + friends_list + [current_user])
+            
+            # 将查询结果转换为字典
+            for sender, count in cursor.fetchall():
+                if sender != current_user:  # 不统计自己
+                    unread_counts[sender] = count
+            
+            # 确保所有好友都有未读数（即使为0）
+            for friend in friends_list:
+                if friend != current_user and friend not in unread_counts:
+                    unread_counts[friend] = 0
         
         conn.close()
         logger.info(f"用户 {current_user} 获取未读消息统计")
@@ -551,15 +666,25 @@ def api_unread_messages():
 def api_mark_messages_as_read():
     """标记消息为已读"""
     users = load_users()
+    
+    # 优先从请求头获取用户信息
     current_user = request.headers.get('X-User')
+    
+    # 如果请求头中没有，尝试从请求体中获取（用于sendBeacon请求）
+    if not current_user:
+        try:
+            current_user = request.json.get('user', '').strip()
+        except:
+            pass
+    
     friend = request.json.get('friend', '').strip()
     
     # 验证用户
-    if current_user not in users:
+    if not current_user or current_user not in users:
         logger.warning(f"用户 {current_user} 未登录，无法标记消息为已读")
         return jsonify({'ok': False, 'msg': '用户未登录'}), 401
     
-    if friend not in users:
+    if not friend or friend not in users:
         logger.warning(f"用户 {current_user} 尝试标记与不存在的用户 {friend} 的消息为已读")
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
     
@@ -579,23 +704,36 @@ def api_mark_messages_as_read():
         
         # 将未读消息标记为已读
         timestamp = datetime.now().isoformat()
+        marked_count = 0
         for (message_id,) in unread_message_ids:
-            cursor.execute('''
-                INSERT INTO read_messages (user, message_id, timestamp)
-                VALUES (?, ?, ?)
-            ''', (current_user, message_id, timestamp))
+            try:
+                cursor.execute('''
+                    INSERT INTO read_messages (user, message_id, timestamp)
+                    VALUES (?, ?, ?)
+                ''', (current_user, message_id, timestamp))
+                marked_count += 1
+            except sqlite3.IntegrityError:
+                # 消息已经被标记为已读，跳过
+                pass
         
         conn.commit()
         conn.close()
         
-        # 通知所有相关会话更新未读消息数
-        socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
-        socketio.emit('unread_update', {'recipient': friend}, room=friend)
+        # 通知所有相关会话更新未读消息数（仅在房间有成员时发送）
+        try:
+            socketio.emit('unread_update', {'recipient': current_user}, room=current_user)
+        except Exception as e:
+            logger.warning(f"发送未读消息更新通知失败 (current_user): {e}")
         
-        logger.info(f"用户 {current_user} 标记与 {friend} 的 {len(unread_message_ids)} 条消息为已读")
-        return jsonify({'ok': True, 'marked_count': len(unread_message_ids)})
+        try:
+            socketio.emit('unread_update', {'recipient': friend}, room=friend)
+        except Exception as e:
+            logger.warning(f"发送未读消息更新通知失败 (friend): {e}")
+        
+        logger.info(f"用户 {current_user} 标记与 {friend} 的 {marked_count} 条消息为已读")
+        return jsonify({'ok': True, 'marked_count': marked_count})
     except Exception as e:
-        logger.error(f"标记消息为已读时出错: {e}")
+        logger.error(f"标记消息为已读时出错: {e}", exc_info=True)
         return jsonify({'ok': False, 'msg': '标记消息为已读失败'}), 500
 
 @app.route('/api/upload-image', methods=['POST'])
@@ -659,16 +797,12 @@ def upload_image():
 def get_image(image_id):
     """获取图片"""
     try:
-        # 首先验证用户是否已登录
+        # 验证用户是否已登录（仅使用HTTP Header验证）
         users = load_users()
         current_user = request.headers.get('X-User')
-        if current_user not in users:
-            # 为了向后兼容，我们允许通过查询参数进行身份验证
-            # 这样前端可以直接在图片URL中传递用户信息
-            current_user = request.args.get('user')
-            if current_user not in users:
-                logger.warning(f"用户未登录，无法获取图片 {image_id}")
-                return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+        if not current_user or current_user not in users:
+            logger.warning(f"用户未登录，无法获取图片 {image_id}")
+            return jsonify({'ok': False, 'msg': '用户未登录'}), 401
             
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -690,7 +824,6 @@ def get_image(image_id):
             
             conn.close()
             logger.warning(f"用户 {current_user} 无权限查看图片 {image_id}")
-            # 对于没有权限的情况，我们仍然返回403错误
             return jsonify({'ok': False, 'msg': '您没有权限查看此图片'}), 403
         
         conn.close()
@@ -1222,6 +1355,32 @@ def flow_statistics():
     """处理对/flowStatistics的请求，避免404日志"""
     return '', 204  # 返回204 No Content状态码
 
+@app.route('/api/admin/migrate-passwords', methods=['POST'])
+def api_migrate_passwords():
+    """迁移所有明文密码到哈希格式（仅用于开发/测试）"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法执行密码迁移")
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    # 检查权限：只有OP可以执行密码迁移
+    if not is_op(current_user):
+        logger.warning(f"用户 {current_user} 无权限执行密码迁移")
+        return jsonify({'ok': False, 'msg': '只有管理员可以执行密码迁移'}), 403
+    
+    # 执行密码迁移
+    migrated = migrate_passwords_to_hash()
+    
+    if migrated:
+        logger.info(f"用户 {current_user} 执行了密码迁移")
+        return jsonify({'ok': True, 'msg': '密码迁移成功'})
+    else:
+        logger.info(f"用户 {current_user} 尝试执行密码迁移，但所有密码已经是哈希格式")
+        return jsonify({'ok': True, 'msg': '所有密码已经是哈希格式，无需迁移'})
+
 # WebSocket事件处理
 @socketio.on('join')
 def on_join(data):
@@ -1256,6 +1415,24 @@ def on_send_message(data):
     # 保存消息到数据库
     save_chat_message(sender, recipient, sender, content)
     logger.info(f"通过WebSocket发送消息：{sender} -> {recipient}")
+
+# 排除CSRF保护的端点（API和WebSocket）
+csrf.exempt(api_login)
+csrf.exempt(api_send_message)
+csrf.exempt(upload_image)
+csrf.exempt(api_add_friend)
+csrf.exempt(api_remove_friend)
+csrf.exempt(api_mark_messages_as_read)
+csrf.exempt(api_clear_chat_history)
+csrf.exempt(api_change_username)
+csrf.exempt(api_change_password)
+csrf.exempt(api_migrate_passwords)
+csrf.exempt(submit_feedback)
+csrf.exempt(set_feedback_status)
+csrf.exempt(upvote_feedback)
+csrf.exempt(cancel_upvote_feedback)
+csrf.exempt(delete_feedback)
+csrf.exempt(check_op_status)
 
 if __name__ == '__main__':
     # 初始化数据库

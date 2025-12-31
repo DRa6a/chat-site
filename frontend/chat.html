@@ -197,19 +197,63 @@
                 });
 
                 // 清空聊天记录
-                clearChatBtn.addEventListener('click', function() {
+                clearChatBtn.addEventListener('click', async function() {
                     if (confirm('确定要清空与 ' + peerName + ' 的所有聊天记录吗？此操作不可恢复！')) {
-                        // 这里应该调用后端API来清空聊天记录
-                        alert('功能开发中：清空聊天记录功能');
+                        try {
+                            const currentUser = sessionStorage.getItem('chat-user');
+                            const response = await fetch('/api/clear-chat-history', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-User': currentUser
+                                },
+                                body: JSON.stringify({
+                                    friendName: peerName
+                                })
+                            });
+                            const result = await response.json();
+                            if (result.ok) {
+                                alert('聊天记录已清空');
+                                // 刷新页面以清空显示的聊天记录
+                                location.reload();
+                            } else {
+                                alert(result.msg || '清空聊天记录失败');
+                            }
+                        } catch (error) {
+                            console.error('清空聊天记录出错:', error);
+                            alert('清空聊天记录出错: ' + error.message);
+                        }
                     }
                     closeSettings();
                 });
 
                 // 删除好友
-                deleteFriendBtn.addEventListener('click', function() {
+                deleteFriendBtn.addEventListener('click', async function() {
                     if (confirm('确定要删除好友 ' + peerName + ' 吗？')) {
-                        // 这里应该调用后端API来删除好友关系
-                        alert('功能开发中：删除好友功能');
+                        try {
+                            const currentUser = sessionStorage.getItem('chat-user');
+                            const response = await fetch('/api/remove-friend', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-User': currentUser
+                                },
+                                body: JSON.stringify({
+                                    friendName: peerName
+                                })
+                            });
+                            const result = await response.json();
+                            if (result.ok) {
+                                alert('好友已删除');
+                                // 跳转回主页
+                                location.href = '/';
+                            } else {
+                                alert(result.msg || '删除好友失败');
+                            }
+                        } catch (error) {
+                            console.error('删除好友出错:', error);
+                            alert('删除好友出错: ' + error.message);
+                        }
                     }
                     closeSettings();
                 });

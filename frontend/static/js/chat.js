@@ -246,7 +246,8 @@ function updateUnreadIndicators(unreadCounts) {
 // 加载好友列表
 async function loadFriends() {
     try {
-        const res = await fetch('/api/friends?u=' + sessionStorage.getItem('chat-user'));
+        const currentUser = sessionStorage.getItem('chat-user');
+        const res = await fetch('/api/friends?u=' + encodeURIComponent(currentUser));
         const list = await res.json();
         const html = list.map(name => {
             // 为每个好友卡片添加data-friend属性，方便后续扩展
@@ -259,7 +260,7 @@ async function loadFriends() {
 
         document.querySelectorAll('.friend-card').forEach(card => {
             card.addEventListener('click', () => {
-                location.href = '/chat/' + card.dataset.friend;
+                location.href = '/chat/' + encodeURIComponent(card.dataset.friend);
             });
         });
         
@@ -362,7 +363,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const editNicknameBtn = document.getElementById('edit-nickname-btn');
     const clearChatBtn = document.getElementById('clear-chat-btn');
     const deleteFriendBtn = document.getElementById('delete-friend-btn');
-    const peerName = document.getElementById('peername').textContent;
+    const peernameElement = document.getElementById('peername');
+    const peerName = peernameElement ? peernameElement.textContent : '';
+
+    // 只有在聊天页面才执行以下代码
+    if (!chatSettingsBtn || !chatSettingsModal) {
+        return;
+    }
 
     // 打开设置模态框
     chatSettingsBtn.addEventListener('click', function() {
