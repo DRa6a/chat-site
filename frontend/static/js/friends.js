@@ -1074,31 +1074,68 @@ class ChatApp {
                     const fileSize = fileData.file_size;
                     const fileType = fileData.file_type;
 
+                    // 确定是否支持预览
+                    const isPreviewable = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf', 'txt', 'js', 'ts', 'html', 'htm', 'css', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'sql', 'json', 'xml', 'yaml', 'yml', 'md', 'csv', 'log'].includes(fileType.toLowerCase());
+                    
                     // 更新消息显示
                     if (messageElement && messageElement.querySelector('.file-loading')) {
-                        messageElement.innerHTML = `
-                            <div class="file-message">
-                                <div class="file-icon">
-                                    ${this.getFileIcon(fileType)}
+                        if (isPreviewable) {
+                            // 支持预览的文件类型 - 点击整个消息预览
+                            messageElement.innerHTML = `
+                                <div class="file-message" data-file-id="${fileId}" data-file-type="${fileType}" data-file-name="${encodeURIComponent(fileName)}">
+                                    <div class="file-icon">
+                                        ${this.getFileIcon(fileType)}
+                                    </div>
+                                    <div class="file-info">
+                                        <div class="file-name">${this.escapeHtml(fileName)}</div>
+                                        <div class="file-meta">${this.formatFileSize(fileSize)} ${fileType ? `· ${this.escapeHtml(fileType)}` : ''}</div>
+                                    </div>
+                                    <div class="file-actions">
+                                        <button class="file-download-btn" data-file-id="${fileId}">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="file-info">
-                                    <div class="file-name">${this.escapeHtml(fileName)}</div>
-                                    <div class="file-meta">${this.formatFileSize(fileSize)} ${fileType ? `· ${this.escapeHtml(fileType)}` : ''}</div>
-                                </div>
-                                <div class="file-actions">
-                                    <button class="file-download-btn" data-file-id="${fileId}">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        `;
+                            `;
 
-                        // 添加下载按钮事件监听器
-                        const downloadBtn = messageElement.querySelector('.file-download-btn');
-                        downloadBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            this.downloadFile(fileId, fileName);
-                        });
+                            // 添加整个消息的点击事件来预览
+                            messageElement.addEventListener('click', (e) => {
+                                // 如果点击的是下载按钮，则不触发预览
+                                if (e.target.closest('.file-download-btn')) {
+                                    e.stopPropagation();
+                                    this.downloadFile(fileId, fileName);
+                                } else {
+                                    // 否则预览文件
+                                    e.stopPropagation();
+                                    this.previewFile(fileId, fileName, fileType);
+                                }
+                            });
+                        } else {
+                            // 不支持预览的文件类型，只显示下载按钮
+                            messageElement.innerHTML = `
+                                <div class="file-message">
+                                    <div class="file-icon">
+                                        ${this.getFileIcon(fileType)}
+                                    </div>
+                                    <div class="file-info">
+                                        <div class="file-name">${this.escapeHtml(fileName)}</div>
+                                        <div class="file-meta">${this.formatFileSize(fileSize)} ${fileType ? `· ${this.escapeHtml(fileType)}` : ''}</div>
+                                    </div>
+                                    <div class="file-actions">
+                                        <button class="file-download-btn" data-file-id="${fileId}">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+
+                            // 添加下载按钮事件监听器
+                            const downloadBtn = messageElement.querySelector('.file-download-btn');
+                            downloadBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                this.downloadFile(fileId, fileName);
+                            });
+                        }
                     }
                 } else {
                     throw new Error(fileInfoResult.msg || '获取文件信息失败');
@@ -1186,6 +1223,327 @@ class ChatApp {
             console.error('下载文件失败:', error);
             alert('下载文件失败: ' + error.message);
         }
+    }
+
+    // 预览文件
+    async previewFile(fileId, fileName, fileType) {
+        // 根据文件类型决定预览方式
+        fileType = fileType.toLowerCase();
+        
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
+            // 图片文件预览，使用已有的图片查看器
+            this.previewImage(fileId, fileName);
+        } else if (fileType === 'pdf') {
+            // PDF文件预览，需要通过后端API获取文件
+            try {
+                const response = await fetch(`/api/get-file/${fileId}`, {
+                    headers: {
+                        'X-User': this.me
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`加载PDF失败: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                const pdfUrl = URL.createObjectURL(blob);
+                
+                // 在新标签页中打开PDF，使用浏览器内置的PDF查看器
+                window.open(pdfUrl, '_blank');
+                
+                // 清理URL对象，但延迟一段时间以确保PDF已加载
+                setTimeout(() => {
+                    URL.revokeObjectURL(pdfUrl);
+                }, 5000);
+            } catch (error) {
+                console.error('预览PDF失败:', error);
+                alert('预览PDF失败: ' + error.message);
+            }
+        } else if (['txt', 'js', 'ts', 'html', 'htm', 'css', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'sql', 'json', 'xml', 'yaml', 'yml', 'md', 'csv', 'log'].includes(fileType)) {
+            // 代码文件预览，获取文件内容并显示在模态框中
+            this.previewCode(fileId, fileName, fileType);
+        } else {
+            // 其他文件类型，显示提示或使用下载功能
+            if (confirm(`当前文件类型 (${fileType}) 不支持在线预览，是否下载？\n文件名: ${fileName}`)) {
+                this.downloadFile(fileId, fileName);
+            }
+        }
+    }
+
+    // 预览图片
+    async previewImage(fileId, fileName) {
+        // 创建或使用现有的图片查看器
+        let imageViewerModal = document.getElementById('image-viewer-modal');
+        if (!imageViewerModal) {
+            imageViewerModal = document.createElement('div');
+            imageViewerModal.id = 'image-viewer-modal';
+            imageViewerModal.className = 'modal';
+            imageViewerModal.innerHTML = `
+                <div class="image-viewer-content">
+                    <span class="close-btn" id="close-image-viewer">&times;</span>
+                    <div class="image-container">
+                        <img id="viewer-image" src="" alt="图片查看">
+                    </div>
+                    <div class="image-navigation">
+                        <div class="image-info">
+                            <span id="current-image-index">1</span>/<span id="total-images">1</span>
+                        </div>
+                    </div>
+                    <div class="image-actions">
+                        <button id="download-image" class="action-btn">
+                            <i class="fas fa-download"></i> 下载
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(imageViewerModal);
+
+            // 添加关闭事件
+            document.getElementById('close-image-viewer').addEventListener('click', () => {
+                imageViewerModal.style.display = 'none';
+                document.body.style.overflow = '';
+            });
+
+            // 点击模态框外部关闭
+            imageViewerModal.addEventListener('click', (event) => {
+                if (event.target === imageViewerModal) {
+                    imageViewerModal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // 添加ESC键关闭功能
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && imageViewerModal.style.display === 'block') {
+                    imageViewerModal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+
+        try {
+            // 使用fetch获取图片blob，确保带上认证信息
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`加载图片失败: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            // 设置图片源并显示模态框
+            const viewerImage = document.getElementById('viewer-image');
+            
+            // 清理之前的URL对象
+            if (viewerImage.src && viewerImage.src.startsWith('blob:')) {
+                URL.revokeObjectURL(viewerImage.src);
+            }
+            
+            viewerImage.src = imageUrl;
+            viewerImage.alt = fileName;
+            
+            // 显示模态框
+            imageViewerModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        } catch (error) {
+            console.error('预览图片失败:', error);
+            alert('预览图片失败: ' + error.message);
+        }
+    }
+
+    // 预览PDF
+    previewPDF(pdfUrl, fileName) {
+        // 在新标签页中打开PDF，使用浏览器内置的PDF查看器
+        window.open(pdfUrl, '_blank');
+    }
+
+    // 预览代码文件
+    async previewCode(fileId, fileName, fileType) {
+        try {
+            // 获取代码文件内容
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`加载文件失败: ${response.status}`);
+            }
+
+            const text = await response.text();
+            
+            // 创建代码预览模态框
+            let codeViewerModal = document.getElementById('code-viewer-modal');
+            if (!codeViewerModal) {
+                codeViewerModal = document.createElement('div');
+                codeViewerModal.id = 'code-viewer-modal';
+                codeViewerModal.className = 'modal';
+                codeViewerModal.innerHTML = `
+                    <div class="code-viewer-content glass">
+                        <div class="modal-header">
+                            <h3>${this.escapeHtml(fileName)}</h3>
+                            <span class="close-btn" id="close-code-viewer">&times;</span>
+                        </div>
+                        <div class="code-content-wrapper">
+                            <pre><code class="code-content" id="code-content"></code></pre>
+                        </div>
+                        <div class="code-actions">
+                            <button id="copy-code-btn" class="glass">
+                                <i class="fas fa-copy"></i> 复制代码
+                            </button>
+                            <button id="download-code-btn" class="glass">
+                                <i class="fas fa-download"></i> 下载
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(codeViewerModal);
+
+                // 添加关闭事件
+                document.getElementById('close-code-viewer').addEventListener('click', () => {
+                    codeViewerModal.style.display = 'none';
+                    document.body.style.overflow = '';
+                });
+
+                // 点击模态框外部关闭
+                codeViewerModal.addEventListener('click', (event) => {
+                    if (event.target === codeViewerModal) {
+                        codeViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
+
+                // 添加ESC键关闭功能
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && codeViewerModal.style.display === 'block') {
+                        codeViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+
+            // 设置代码内容
+            const codeContentElement = document.getElementById('code-content');
+            // 简单的语法高亮实现
+            codeContentElement.innerHTML = this.highlightSyntax(text, fileType);
+            
+            // 添加复制按钮事件
+            document.getElementById('copy-code-btn').onclick = () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    // 显示复制成功的临时提示
+                    const copyBtn = document.getElementById('copy-code-btn');
+                    const originalHTML = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalHTML;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    alert('复制失败');
+                });
+            };
+
+            // 添加下载按钮事件
+            document.getElementById('download-code-btn').onclick = () => {
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            };
+
+            // 显示模态框
+            codeViewerModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        } catch (error) {
+            console.error('预览代码失败:', error);
+            alert('预览代码失败: ' + error.message);
+        }
+    }
+
+    // 简单的语法高亮函数
+    highlightSyntax(code, fileType) {
+        // 先对代码进行HTML转义以确保安全
+        let highlightedCode = this.escapeHtml(code);
+        
+        // 定义各种语言的关键字
+        const keywords = {
+            js: ['var', 'let', 'const', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'typeof', 'instanceof', 'in', 'of', 'class', 'extends', 'import', 'export', 'default', 'from', 'as', 'async', 'await', 'yield', 'static', 'get', 'set', 'constructor'],
+            ts: ['var', 'let', 'const', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'typeof', 'instanceof', 'in', 'of', 'class', 'extends', 'import', 'export', 'default', 'from', 'as', 'async', 'await', 'yield', 'static', 'get', 'set', 'constructor', 'type', 'interface', 'enum', 'public', 'private', 'protected', 'readonly', 'any', 'string', 'number', 'boolean', 'null', 'undefined', 'void', 'never', 'true', 'false'],
+            java: ['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'],
+            py: ['and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'exec', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'not', 'or', 'pass', 'print', 'raise', 'return', 'try', 'while', 'with', 'yield', 'True', 'False', 'None'],
+            cpp: ['auto', 'break', 'case', 'char', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extern', 'float', 'for', 'goto', 'if', 'int', 'long', 'register', 'return', 'short', 'signed', 'sizeof', 'static', 'struct', 'switch', 'typedef', 'union', 'unsigned', 'void', 'volatile', 'while', 'asm', 'bool', 'catch', 'class', 'const_cast', 'delete', 'dynamic_cast', 'explicit', 'export', 'false', 'friend', 'inline', 'mutable', 'namespace', 'new', 'operator', 'private', 'protected', 'public', 'reinterpret_cast', 'static_cast', 'template', 'this', 'throw', 'true', 'try', 'typeid', 'typename', 'using', 'virtual', 'wchar_t'],
+            html: ['html', 'head', 'title', 'body', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'div', 'span', 'a', 'img', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'form', 'input', 'button', 'script', 'style', 'link', 'meta', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'main', 'figure', 'figcaption', 'small', 'strong', 'em', 'i', 'b', 'u', 'pre', 'code', 'blockquote', 'cite', 'q', 'abbr', 'address', 'time', 'progress', 'meter', 'output', 'datalist', 'optgroup', 'option', 'textarea', 'select', 'label', 'fieldset', 'legend', 'details', 'summary', 'dialog', 'menu', 'menuitem', 'applet', 'embed', 'iframe', 'object', 'param', 'source', 'track', 'video', 'audio', 'canvas', 'map', 'area', 'base', 'col', 'colgroup', 'tbody', 'thead', 'tfoot'],
+            css: ['align-content', 'align-items', 'align-self', 'all', 'animation', 'animation-delay', 'animation-direction', 'animation-duration', 'animation-fill-mode', 'animation-iteration-count', 'animation-name', 'animation-play-state', 'animation-timing-function', 'backface-visibility', 'background', 'background-attachment', 'background-blend-mode', 'background-clip', 'background-color', 'background-image', 'background-origin', 'background-position', 'background-repeat', 'background-size', 'border', 'border-bottom', 'border-bottom-color', 'border-bottom-left-radius', 'border-bottom-right-radius', 'border-bottom-style', 'border-bottom-width', 'border-collapse', 'border-color', 'border-image', 'border-image-outset', 'border-image-repeat', 'border-image-slice', 'border-image-source', 'border-image-width', 'border-left', 'border-left-color', 'border-left-style', 'border-left-width', 'border-radius', 'border-right', 'border-right-color', 'border-right-style', 'border-right-width', 'border-spacing', 'border-style', 'border-top', 'border-top-color', 'border-top-left-radius', 'border-top-right-radius', 'border-top-style', 'border-top-width', 'border-width', 'bottom', 'box-decoration-break', 'box-shadow', 'box-sizing', 'break-after', 'break-before', 'break-inside', 'caption-side', 'clear', 'clip', 'clip-path', 'color', 'column-count', 'column-fill', 'column-gap', 'column-rule', 'column-rule-color', 'column-rule-style', 'column-rule-width', 'column-span', 'column-width', 'columns', 'content', 'counter-increment', 'counter-reset', 'cursor', 'direction', 'display', 'empty-cells', 'filter', 'flex', 'flex-basis', 'flex-direction', 'flex-flow', 'flex-grow', 'flex-shrink', 'flex-wrap', 'float', 'font', 'font-family', 'font-feature-settings', 'font-kerning', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'grid', 'grid-area', 'grid-auto-columns', 'grid-auto-flow', 'grid-auto-rows', 'grid-column', 'grid-column-end', 'grid-column-gap', 'grid-column-start', 'grid-gap', 'grid-row', 'grid-row-end', 'grid-row-gap', 'grid-row-start', 'grid-template', 'grid-template-areas', 'grid-template-columns', 'grid-template-rows', 'hanging-punctuation', 'height', 'hyphens', 'icon', 'image-orientation', 'image-rendering', 'image-resolution', 'ime-mode', 'justify-content', 'left', 'letter-spacing', 'line-break', 'line-height', 'list-style', 'list-style-image', 'list-style-position', 'list-style-type', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'max-height', 'max-width', 'min-height', 'min-width', 'nav-down', 'nav-index', 'nav-left', 'nav-right', 'nav-up', 'object-fit', 'object-position', 'opacity', 'order', 'orphans', 'outline', 'outline-color', 'outline-offset', 'outline-style', 'outline-width', 'overflow', 'overflow-wrap', 'overflow-x', 'overflow-y', 'padding', 'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'page-break-after', 'page-break-before', 'page-break-inside', 'perspective', 'perspective-origin', 'pointer-events', 'position', 'quotes', 'resize', 'right', 'tab-size', 'table-layout', 'text-align', 'text-align-last', 'text-decoration', 'text-decoration-color', 'text-decoration-line', 'text-decoration-style', 'text-indent', 'text-justify', 'text-overflow', 'text-shadow', 'text-transform', 'top', 'transform', 'transform-origin', 'transform-style', 'transition', 'transition-delay', 'transition-duration', 'transition-property', 'transition-timing-function', 'unicode-bidi', 'vertical-align', 'visibility', 'white-space', 'widows', 'width', 'word-break', 'word-spacing', 'word-wrap', 'z-index'],
+            php: ['and', 'or', 'xor', 'as', 'break', 'case', 'cfunction', 'class', 'const', 'continue', 'declare', 'default', 'do', 'else', 'elseif', 'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'extends', 'for', 'foreach', 'function', 'include', 'include_once', 'global', 'if', 'new', 'old_function', 'return', 'static', 'switch', 'use', 'require', 'require_once', 'var', 'while', 'abstract', 'catch', 'final', 'implements', 'interface', 'instanceof', 'namespace', 'private', 'protected', 'public', 'throw', 'try', 'final'],
+            sql: ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'TABLE', 'DATABASE', 'INDEX', 'VIEW', 'TRIGGER', 'PROCEDURE', 'FUNCTION', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'UNIQUE', 'NOT', 'NULL', 'DEFAULT', 'CHECK', 'CONSTRAINT', 'UNION', 'ALL', 'EXCEPT', 'INTERSECT', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'OUTER', 'ON', 'GROUP', 'BY', 'HAVING', 'ORDER', 'LIMIT', 'OFFSET', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'IS', 'INTO', 'VALUES', 'COMMIT', 'ROLLBACK', 'TRANSACTION', 'BEGIN', 'ADD', 'COLUMN', 'TO', 'BY', 'ASC', 'DESC', 'TRUE', 'FALSE']
+        };
+
+        // 为字符串添加高亮（先处理，避免干扰关键字匹配）
+        highlightedCode = this.highlightStrings(highlightedCode);
+        
+        // 为注释添加高亮（在字符串之后，但在关键字之前）
+        highlightedCode = this.highlightComments(highlightedCode, fileType);
+        
+        // 为关键字添加高亮
+        const languageKeywords = keywords[fileType] || [];
+        highlightedCode = this.highlightKeywords(highlightedCode, languageKeywords);
+        
+        return highlightedCode;
+    }
+
+    // 为注释添加高亮
+    highlightComments(code, fileType) {
+        // 多行注释 - 处理 /* */ 和 /** */ 样式
+        code = code.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
+        
+        // 单行注释 - 根据语言类型
+        if (['js', 'ts', 'java', 'cpp', 'css', 'php'].includes(fileType)) {
+            code = code.replace(/(\/\/.*)/g, '<span class="comment">$1</span>');
+        } else if (['py', 'sql', 'rb'].includes(fileType)) {
+            code = code.replace(/(#.*)/g, '<span class="comment">$1</span>');
+        } else if (['html'].includes(fileType)) {
+            code = code.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="comment">$1</span>');
+        }
+        
+        return code;
+    }
+
+    // 为关键字添加高亮
+    highlightKeywords(code, keywords) {
+        if (!keywords || keywords.length === 0) return code;
+        
+        // 创建匹配关键字的正则表达式，使用非重叠匹配
+        for (const keyword of keywords) {
+            // 使用单词边界确保完整匹配关键字，防止部分匹配
+            const regex = new RegExp('\\b' + this.escapeRegExp(keyword) + '\\b', 'g');
+            code = code.replace(regex, '<span class="keyword">$&</span>');
+        }
+        
+        return code;
+    }
+
+    // 为字符串添加高亮
+    highlightStrings(code) {
+        // 匹配单引号和双引号字符串（处理转义字符）
+        return code.replace(/("[^"\\]*(\\.[^"\\]*)*"|'[^'\\]*(\\.[^'\\]*)*')/g, '<span class="string">$1</span>');
+    }
+
+    // 转义正则表达式特殊字符
+    escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     addMessageToUI(message, isOwnMessage = false) {
