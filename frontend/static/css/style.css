@@ -1864,3 +1864,70 @@ select.glass:focus {
 .set-status-btn:hover {
     background: rgba(82, 196, 26, 0.1);
 }
+
+/* 文件消息样式 */
+.file-message {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+}
+
+.file-icon {
+    font-size: 24px;
+    color: #0078ff;
+    flex-shrink: 0;
+}
+
+.file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-name {
+    font-weight: 500;
+    font-size: 0.95em;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--font-color);
+}
+
+.file-meta {
+    font-size: 0.8em;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--font-color);
+}
+
+.file-error {
+    color: #ff4d4f;
+    font-size: 0.9em;
+}
+
+.file-actions {
+    flex-shrink: 0;
+}
+
+.file-download-btn {
+    background: none;
+    border: none;
+    color: var(--font-color);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.file-download-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.theme-dark .file-download-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}

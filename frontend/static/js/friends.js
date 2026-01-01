@@ -65,6 +65,12 @@ class ChatApp {
             this.hideMorePanel();
         });
 
+        // 文件上传按钮事件
+        document.getElementById('upload-file-btn').addEventListener('click', () => {
+            document.getElementById('file-upload').click();
+            this.hideMorePanel();
+        });
+
         // 音乐搜索按钮事件
         document.getElementById('search-music-btn').addEventListener('click', () => {
             this.showMusicSearchModal();
@@ -74,6 +80,11 @@ class ChatApp {
         // 图片选择事件
         document.getElementById('image-upload').addEventListener('change', (e) => {
             this.uploadImage(e.target.files[0]);
+        });
+
+        // 文件选择事件
+        document.getElementById('file-upload').addEventListener('change', (e) => {
+            this.uploadFile(e.target.files[0]);
         });
 
         // 回车发送消息
@@ -917,6 +928,83 @@ class ChatApp {
         }
     }
 
+    async uploadFile(file) {
+        if (!file) return;
+
+        // 创建FormData对象用于上传文件
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // 显示上传中提示
+            const sendButton = document.getElementById('send-btn');
+            const morePanelBtn = document.getElementById('upload-file-btn');
+            const originalSendText = sendButton.innerHTML;
+            const originalMorePanelBtnHTML = morePanelBtn.innerHTML;
+
+            sendButton.disabled = true;
+            morePanelBtn.disabled = true;
+            sendButton.innerHTML = '上传中...';
+            morePanelBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中...';
+
+            // 上传文件
+            const uploadResponse = await fetch('/api/upload-file', {
+                method: 'POST',
+                headers: {
+                    'X-User': this.me
+                },
+                body: formData
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            // 恢复按钮状态
+            sendButton.disabled = false;
+            morePanelBtn.disabled = false;
+            sendButton.innerHTML = originalSendText;
+            morePanelBtn.innerHTML = '<i class="fas fa-file"></i> <span>发送文件</span>';
+
+            if (uploadResult.ok) {
+                // 上传成功，发送文件消息
+                const fileMessage = `File_${uploadResult.file_id}`;
+                const response = await fetch('/api/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User': this.me
+                    },
+                    body: JSON.stringify({
+                        recipient: this.peer,
+                        content: fileMessage
+                    })
+                });
+
+                const result = await response.json();
+                if (result.ok) {
+                    // 清空文件选择
+                    document.getElementById('file-upload').value = '';
+                    // 立即检查新消息以确保显示最新内容
+                    setTimeout(() => this.checkForNewMessages(), 100);
+                } else {
+                    this.showErrorMessage(result.msg || '发送文件消息失败');
+                }
+            } else {
+                this.showErrorMessage(uploadResult.msg || '文件上传失败');
+            }
+        } catch (error) {
+            console.error('上传文件出错:', error);
+            this.showErrorMessage('文件上传失败: ' + error.message);
+
+            // 恢复按钮状态
+            const sendButton = document.getElementById('send-btn');
+            const morePanelBtn = document.getElementById('upload-file-btn');
+            sendButton.disabled = false;
+            morePanelBtn.disabled = false;
+            sendButton.innerHTML = '发送';
+            morePanelBtn.innerHTML = '<i class="fas fa-file"></i> <span>发送文件</span>';
+        }
+    }
+
     // 显示错误消息
     showErrorMessage(message) {
         // 创建或更新错误消息元素
@@ -937,6 +1025,167 @@ class ChatApp {
         setTimeout(() => {
             errorMsg.style.display = 'none';
         }, 3000);
+    }
+
+    // 加载文件数据
+    async loadFileData(fileId, messageElement, isOwnMessage) {
+        try {
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                method: 'HEAD', // 仅获取头部信息，不下载文件内容
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                // 如果HEAD请求失败，尝试用GET获取文件信息（从数据库获取）
+                this.fetchFileDetailsFromAPI(fileId, messageElement, isOwnMessage);
+                return;
+            }
+
+            // HEAD请求成功，但我们仍需从数据库获取文件详细信息
+            this.fetchFileDetailsFromAPI(fileId, messageElement, isOwnMessage);
+        } catch (error) {
+            console.error('加载文件信息失败:', error);
+            // 更新消息显示为错误状态
+            if (messageElement && messageElement.querySelector('.file-loading')) {
+                messageElement.querySelector('.file-loading').innerHTML = `
+                    <div class="file-error">加载文件信息失败</div>
+                `;
+            }
+        }
+    }
+
+    // 从API获取文件详细信息
+    async fetchFileDetailsFromAPI(fileId, messageElement, isOwnMessage) {
+        try {
+            // 通过专门的API获取文件信息
+            const fileInfoResponse = await fetch(`/api/get-file-info/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (fileInfoResponse.ok) {
+                const fileInfoResult = await fileInfoResponse.json();
+                if (fileInfoResult.ok) {
+                    const fileData = fileInfoResult.file;
+                    const fileName = fileData.original_name;
+                    const fileSize = fileData.file_size;
+                    const fileType = fileData.file_type;
+
+                    // 更新消息显示
+                    if (messageElement && messageElement.querySelector('.file-loading')) {
+                        messageElement.innerHTML = `
+                            <div class="file-message">
+                                <div class="file-icon">
+                                    ${this.getFileIcon(fileType)}
+                                </div>
+                                <div class="file-info">
+                                    <div class="file-name">${this.escapeHtml(fileName)}</div>
+                                    <div class="file-meta">${this.formatFileSize(fileSize)} ${fileType ? `· ${this.escapeHtml(fileType)}` : ''}</div>
+                                </div>
+                                <div class="file-actions">
+                                    <button class="file-download-btn" data-file-id="${fileId}">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        // 添加下载按钮事件监听器
+                        const downloadBtn = messageElement.querySelector('.file-download-btn');
+                        downloadBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.downloadFile(fileId, fileName);
+                        });
+                    }
+                } else {
+                    throw new Error(fileInfoResult.msg || '获取文件信息失败');
+                }
+            } else {
+                throw new Error(`请求失败: ${fileInfoResponse.status}`);
+            }
+        } catch (error) {
+            console.error('获取文件详细信息失败:', error);
+            // 更新消息显示为错误状态
+            if (messageElement && messageElement.querySelector('.file-loading')) {
+                messageElement.querySelector('.file-loading').innerHTML = `
+                    <div class="file-error">加载文件信息失败</div>
+                `;
+            }
+        }
+    }
+
+    // 获取文件类型对应的图标
+    getFileIcon(fileType) {
+        fileType = fileType.toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
+            return '<i class="fas fa-file-image" style="color: white;"></i>';
+        } else if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(fileType)) {
+            return '<i class="fas fa-file-video" style="color: white;"></i>';
+        } else if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(fileType)) {
+            return '<i class="fas fa-file-audio" style="color: white;"></i>';
+        } else if (['pdf'].includes(fileType)) {
+            return '<i class="fas fa-file-pdf" style="color: white;"></i>';
+        } else if (['doc', 'docx'].includes(fileType)) {
+            return '<i class="fas fa-file-word" style="color: white;"></i>';
+        } else if (['xls', 'xlsx'].includes(fileType)) {
+            return '<i class="fas fa-file-excel" style="color: white;"></i>';
+        } else if (['ppt', 'pptx'].includes(fileType)) {
+            return '<i class="fas fa-file-powerpoint" style="color: white;"></i>';
+        } else if (['txt', 'log'].includes(fileType)) {
+            return '<i class="fas fa-file-alt" style="color: white;"></i>';
+        } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(fileType)) {
+            return '<i class="fas fa-file-archive" style="color: white;"></i>';
+        } else {
+            return '<i class="fas fa-file" style="color: white;"></i>';
+        }
+    }
+
+    // 格式化文件大小
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 下载文件
+    async downloadFile(fileId, fileName) {
+        try {
+            // 通过API获取文件并下载
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`下载失败: ${response.status} ${response.statusText}`);
+            }
+
+            // 获取blob数据
+            const blob = await response.blob();
+            
+            // 创建下载链接
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName; // 使用原始文件名
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('下载文件失败:', error);
+            alert('下载文件失败: ' + error.message);
+        }
     }
 
     addMessageToUI(message, isOwnMessage = false) {
@@ -1045,6 +1294,34 @@ class ChatApp {
             });
 
             container.appendChild(messageElement);
+            
+            // 返回统一结构
+            return { element: messageElement, imagePromise: Promise.resolve() };
+        }
+        // 检查是否是文件消息
+        else if (message.content.startsWith('File_')) {
+            // 提取文件ID
+            const fileId = message.content.substring(5);
+            
+            // 文件消息使用特殊样式
+            messageElement.className = `message-bubble ${isOwnMessage ? 'me' : 'peer'}`;
+            
+            // 首先显示加载状态
+            messageElement.innerHTML = `
+                <div class="file-message">
+                    <div class="file-icon">
+                        <i class="fas fa-file"></i>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-loading">加载文件信息...</div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(messageElement);
+            
+            // 获取文件信息并更新显示
+            this.loadFileData(fileId, messageElement, isOwnMessage);
             
             // 返回统一结构
             return { element: messageElement, imagePromise: Promise.resolve() };

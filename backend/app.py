@@ -112,6 +112,19 @@ def init_db():
         )
     ''')
     
+    # 创建文件表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            file_type TEXT NOT NULL,
+            uploader TEXT NOT NULL,
+            upload_time TEXT NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -793,6 +806,66 @@ def upload_image():
     logger.warning(f"用户 {current_user} 上传图片失败")
     return jsonify({'ok': False, 'msg': '上传失败'}), 500
 
+@app.route('/api/upload-file', methods=['POST'])
+def upload_file():
+    """上传文件API"""
+    users = load_users()
+    current_user = request.headers.get('X-User')
+    
+    # 验证用户
+    if current_user not in users:
+        logger.warning(f"用户 {current_user} 未登录，无法上传文件")
+        return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+    
+    if 'file' not in request.files:
+        logger.warning(f"用户 {current_user} 上传文件失败：没有上传文件")
+        return jsonify({'ok': False, 'msg': '没有上传文件'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        logger.warning(f"用户 {current_user} 上传文件失败：文件名为空")
+        return jsonify({'ok': False, 'msg': '文件名为空'}), 400
+    
+    if file:
+        try:
+            # 生成唯一文件名
+            ext = os.path.splitext(file.filename)[1]
+            if not ext:
+                ext = '.bin'  # 默认扩展名
+            unique_filename = str(uuid.uuid4()) + ext
+            file_path = UPLOAD_FOLDER / unique_filename
+            
+            # 保存文件
+            file.save(file_path)
+            
+            # 获取文件大小
+            file_size = os.path.getsize(file_path)
+            
+            # 保存文件信息到数据库
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO files (filename, original_name, file_size, file_type, uploader, upload_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (unique_filename, file.filename, file_size, ext.lower()[1:], current_user, datetime.now().isoformat()))
+            
+            file_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            
+            logger.info(f"用户 {current_user} 上传文件成功: {file.filename} ({file_size} bytes)")
+            return jsonify({'ok': True, 'file_id': file_id, 'msg': '文件上传成功'})
+        except Exception as e:
+            # 如果保存数据库失败，删除已上传的文件
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+            logger.error(f"保存文件信息到数据库时出错: {e}")
+            return jsonify({'ok': False, 'msg': f'上传失败: {str(e)}'}), 500
+    
+    logger.warning(f"用户 {current_user} 上传文件失败")
+    return jsonify({'ok': False, 'msg': '上传失败'}), 500
+
 @app.route('/api/get-image/<int:image_id>')
 def get_image(image_id):
     """获取图片"""
@@ -832,6 +905,96 @@ def get_image(image_id):
     except Exception as e:
         logger.error(f"获取图片时出错: {e}")
         return jsonify({'ok': False, 'msg': '获取图片失败'}), 500
+
+@app.route('/api/get-file/<int:file_id>')
+def get_file(file_id):
+    """获取文件"""
+    try:
+        # 验证用户是否已登录（仅使用HTTP Header验证）
+        users = load_users()
+        current_user = request.headers.get('X-User')
+        if not current_user or current_user not in users:
+            logger.warning(f"用户未登录，无法获取文件 {file_id}")
+            return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+            
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 获取文件信息，包括上传者
+        cursor.execute('SELECT filename, uploader FROM files WHERE id = ?', (file_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            filename, uploader = result
+            # 检查当前用户是否有权限访问这个文件
+            # 用户可以访问自己上传的文件，或者与自己有聊天记录的文件
+            if current_user == uploader or is_user_involved_in_file_chat(current_user, file_id):
+                file_path = UPLOAD_FOLDER / filename
+                if os.path.exists(file_path):
+                    conn.close()
+                    logger.info(f"用户 {current_user} 获取文件 {file_id}")
+                    return send_from_directory(UPLOAD_FOLDER, filename)
+            
+            conn.close()
+            logger.warning(f"用户 {current_user} 无权限查看文件 {file_id}")
+            return jsonify({'ok': False, 'msg': '您没有权限查看此文件'}), 403
+        
+        conn.close()
+        logger.warning(f"用户 {current_user} 尝试获取不存在的文件 {file_id}")
+        return jsonify({'ok': False, 'msg': '文件不存在'}), 404
+    except Exception as e:
+        logger.error(f"获取文件时出错: {e}")
+        return jsonify({'ok': False, 'msg': '获取文件失败'}), 500
+
+@app.route('/api/get-file-info/<int:file_id>')
+def get_file_info(file_id):
+    """获取文件信息"""
+    try:
+        # 验证用户是否已登录（仅使用HTTP Header验证）
+        users = load_users()
+        current_user = request.headers.get('X-User')
+        if not current_user or current_user not in users:
+            logger.warning(f"用户未登录，无法获取文件信息 {file_id}")
+            return jsonify({'ok': False, 'msg': '用户未登录'}), 401
+            
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 获取文件信息
+        cursor.execute('SELECT filename, original_name, file_size, file_type, uploader, upload_time FROM files WHERE id = ?', (file_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            filename, original_name, file_size, file_type, uploader, upload_time = result
+            
+            # 检查当前用户是否有权限访问这个文件
+            # 用户可以访问自己上传的文件，或者与自己有聊天记录的文件
+            if current_user == uploader or is_user_involved_in_file_chat(current_user, file_id):
+                conn.close()
+                
+                file_info = {
+                    'id': file_id,
+                    'filename': filename,
+                    'original_name': original_name,
+                    'file_size': file_size,
+                    'file_type': file_type,
+                    'uploader': uploader,
+                    'upload_time': upload_time
+                }
+                
+                logger.info(f"用户 {current_user} 获取文件信息 {file_id}")
+                return jsonify({'ok': True, 'file': file_info})
+            
+            conn.close()
+            logger.warning(f"用户 {current_user} 无权限查看文件信息 {file_id}")
+            return jsonify({'ok': False, 'msg': '您没有权限查看此文件信息'}), 403
+        
+        conn.close()
+        logger.warning(f"用户 {current_user} 尝试获取不存在的文件信息 {file_id}")
+        return jsonify({'ok': False, 'msg': '文件不存在'}), 404
+    except Exception as e:
+        logger.error(f"获取文件信息时出错: {e}")
+        return jsonify({'ok': False, 'msg': '获取文件信息失败'}), 500
 
 @app.route('/api/music/search')
 def music_search():
@@ -1420,6 +1583,8 @@ def on_send_message(data):
 csrf.exempt(api_login)
 csrf.exempt(api_send_message)
 csrf.exempt(upload_image)
+csrf.exempt(upload_file)
+csrf.exempt(get_file_info)
 csrf.exempt(api_add_friend)
 csrf.exempt(api_remove_friend)
 csrf.exempt(api_mark_messages_as_read)
@@ -1466,4 +1631,30 @@ def is_user_involved_in_image_chat(current_user, image_id):
         return False
     except Exception as e:
         logger.error(f"检查用户聊天权限时出错: {e}")
+        return False
+
+def is_user_involved_in_file_chat(current_user, file_id):
+    """检查用户是否参与了包含该文件的聊天"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 查找包含该文件的消息
+        cursor.execute('''
+            SELECT sender, recipient 
+            FROM messages 
+            WHERE content = ?
+        ''', (f"File_{file_id}",))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            sender, recipient = result
+            # 如果用户是发送者或接收者，则有权查看文件
+            return current_user == sender or current_user == recipient
+            
+        return False
+    except Exception as e:
+        logger.error(f"检查用户文件聊天权限时出错: {e}")
         return False
