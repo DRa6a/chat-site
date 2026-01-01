@@ -1121,25 +1121,25 @@ class ChatApp {
     getFileIcon(fileType) {
         fileType = fileType.toLowerCase();
         if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
-            return '<i class="fas fa-file-image" style="color: white;"></i>';
+            return '<i class="fas fa-file-image" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(fileType)) {
-            return '<i class="fas fa-file-video" style="color: white;"></i>';
+            return '<i class="fas fa-file-video" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(fileType)) {
-            return '<i class="fas fa-file-audio" style="color: white;"></i>';
+            return '<i class="fas fa-file-audio" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['pdf'].includes(fileType)) {
-            return '<i class="fas fa-file-pdf" style="color: white;"></i>';
+            return '<i class="fas fa-file-pdf" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['doc', 'docx'].includes(fileType)) {
-            return '<i class="fas fa-file-word" style="color: white;"></i>';
+            return '<i class="fas fa-file-word" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['xls', 'xlsx'].includes(fileType)) {
-            return '<i class="fas fa-file-excel" style="color: white;"></i>';
+            return '<i class="fas fa-file-excel" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['ppt', 'pptx'].includes(fileType)) {
-            return '<i class="fas fa-file-powerpoint" style="color: white;"></i>';
+            return '<i class="fas fa-file-powerpoint" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['txt', 'log'].includes(fileType)) {
-            return '<i class="fas fa-file-alt" style="color: white;"></i>';
+            return '<i class="fas fa-file-alt" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(fileType)) {
-            return '<i class="fas fa-file-archive" style="color: white;"></i>';
+            return '<i class="fas fa-file-archive" style="color: rgba(255, 255, 255, 0.8);"></i>';
         } else {
-            return '<i class="fas fa-file" style="color: white;"></i>';
+            return '<i class="fas fa-file" style="color: rgba(255, 255, 255, 0.8);"></i>';
         }
     }
 
