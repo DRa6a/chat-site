@@ -1865,6 +1865,349 @@ select.glass:focus {
     background: rgba(82, 196, 26, 0.1);
 }
 
+/* Markdown预览模态框样式 */
+#markdown-viewer-modal {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation: fadeIn 0.3s;
+}
+
+.markdown-viewer-content {
+    position: relative;
+    width: 90%;
+    max-width: 900px;
+    height: 80%;
+    margin: 5% auto;
+    display: flex;
+    flex-direction: column;
+    color: var(--font-color);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+}
+
+.markdown-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn {
+    padding: 12px 20px;
+    border: none;
+    background: transparent;
+    color: var(--font-color);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+    flex: 1;
+    text-align: center;
+    font-weight: 500;
+}
+
+.tab-btn.active {
+    border-bottom: 2px solid #0078ff;
+    background: rgba(0, 120, 255, 0.1);
+    font-weight: 600;
+}
+
+.tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.markdown-content-wrapper {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.markdown-content {
+    max-height: 100%;
+    overflow-y: auto;
+    flex: 1;
+    padding: 10px;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    margin: 1em 0 0.5em 0;
+    color: #0078ff;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 0.3em;
+}
+
+.markdown-content p {
+    margin: 0.8em 0;
+    line-height: 1.6;
+}
+
+.markdown-content code {
+    background: rgba(0, 120, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #ff6b6b;
+    border: 1px solid var(--glass-border);
+}
+
+.markdown-content pre {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1em 0;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.markdown-content pre code {
+    background: none;
+    padding: 0;
+    color: var(--font-color);
+    border: none;
+}
+
+.markdown-content a {
+    color: #0078ff;
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+
+.markdown-content img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 8px 0;
+    border: 1px solid var(--glass-border);
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    padding-left: 20px;
+    margin: 0.8em 0;
+}
+
+.markdown-content li {
+    margin: 0.4em 0;
+}
+
+.markdown-source {
+    flex: 1;
+    width: 100%;
+    background: var(--glass-bg);
+    color: var(--font-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 0;
+    overflow: auto;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 14px;
+}
+
+.markdown-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* HTML预览模态框样式 */
+#html-viewer-modal {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation: fadeIn 0.3s;
+}
+
+.html-viewer-content {
+    position: relative;
+    width: 90%;
+    max-width: 1200px;
+    height: 80%;
+    margin: 5% auto;
+    display: flex;
+    flex-direction: column;
+    color: var(--font-color);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+}
+
+.html-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.html-content-wrapper {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.html-content {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: white;
+}
+
+.html-source {
+    flex: 1;
+    width: 100%;
+    background: var(--glass-bg);
+    color: var(--font-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 0;
+    overflow: auto;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 14px;
+}
+
+.html-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* 代码预览模态框样式（统一代码、Markdown源码和HTML源码样式） */
+.code-viewer-modal {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation: fadeIn 0.3s;
+}
+
+.code-viewer-content {
+    position: relative;
+    width: 90%;
+    max-width: 900px;
+    height: 80%;
+    margin: 5% auto;
+    display: flex;
+    flex-direction: column;
+    color: var(--font-color);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(var(--blur));
+    backdrop-filter: blur(var(--blur));
+    border-radius: var(--radius);
+}
+
+.code-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.code-tab-btn {
+    padding: 12px 20px;
+    border: none;
+    background: transparent;
+    color: var(--font-color);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+    flex: 1;
+    text-align: center;
+    font-weight: 500;
+}
+
+.code-tab-btn.active {
+    border-bottom: 2px solid #0078ff;
+    background: rgba(0, 120, 255, 0.1);
+    font-weight: 600;
+}
+
+.code-tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.code-content-wrapper {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.code-content {
+    flex: 1;
+    width: 100%;
+    background: var(--glass-bg);
+    color: var(--font-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 0;
+    overflow: auto;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 14px;
+}
+
+.code-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+}
+
 /* 文件消息样式 */
 .file-message {
     display: flex;
@@ -2049,32 +2392,7 @@ select.glass:focus {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* 代码语法高亮样式 */
-.code-content .keyword {
-    color: #d73a49; /* 红色 */
-    font-weight: bold;
-}
 
-.code-content .comment {
-    color: #6a737d; /* 灰色 */
-    font-style: italic;
-}
-
-.code-content .string {
-    color: #032f62; /* 深蓝色 */
-}
-
-.code-content .number {
-    color: #005cc5; /* 蓝色 */
-}
-
-.code-content .function {
-    color: #6f42c1; /* 紫色 */
-}
-
-.code-content .class {
-    color: #22863a; /* 绿色 */
-}
 
 /* 响应式设计 */
 @media (max-width: 768px) {

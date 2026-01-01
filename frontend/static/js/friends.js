@@ -1260,7 +1260,13 @@ class ChatApp {
                 console.error('预览PDF失败:', error);
                 alert('预览PDF失败: ' + error.message);
             }
-        } else if (['txt', 'js', 'ts', 'html', 'htm', 'css', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'sql', 'json', 'xml', 'yaml', 'yml', 'md', 'csv', 'log'].includes(fileType)) {
+        } else if (fileType === 'md') {
+            // Markdown文件预览
+            this.previewMarkdown(fileId, fileName);
+        } else if (['html', 'htm'].includes(fileType)) {
+            // HTML文件预览
+            this.previewHTML(fileId, fileName);
+        } else if (['txt', 'js', 'ts', 'css', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'sql', 'json', 'xml', 'yaml', 'yml', 'csv', 'log'].includes(fileType)) {
             // 代码文件预览，获取文件内容并显示在模态框中
             this.previewCode(fileId, fileName, fileType);
         } else {
@@ -1363,6 +1369,367 @@ class ChatApp {
         window.open(pdfUrl, '_blank');
     }
 
+    // 预览Markdown文件
+    async previewMarkdown(fileId, fileName) {
+        try {
+            // 获取Markdown文件内容
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`加载文件失败: ${response.status}`);
+            }
+
+            const markdownText = await response.text();
+            
+            // 创建Markdown预览模态框
+            let markdownViewerModal = document.getElementById('markdown-viewer-modal');
+            if (!markdownViewerModal) {
+                markdownViewerModal = document.createElement('div');
+                markdownViewerModal.id = 'markdown-viewer-modal';
+                markdownViewerModal.className = 'modal';
+                markdownViewerModal.innerHTML = `
+                    <div class="markdown-viewer-content glass">
+                        <div class="modal-header">
+                            <h3>${this.escapeHtml(fileName)}</h3>
+                            <span class="close-btn" id="close-markdown-viewer">&times;</span>
+                        </div>
+                        <div class="markdown-tabs">
+                            <button id="markdown-preview-tab" class="tab-btn active">预览</button>
+                            <button id="markdown-source-tab" class="tab-btn">源码</button>
+                        </div>
+                        <div class="markdown-content-wrapper">
+                            <div class="markdown-content" id="markdown-content">${this.renderMarkdown(markdownText)}</div>
+                            <pre class="markdown-source" id="markdown-source" style="display: none;">${this.escapeHtml(markdownText)}</pre>
+                        </div>
+                        <div class="markdown-actions">
+                            <button id="copy-markdown-btn" class="glass">
+                                <i class="fas fa-copy"></i> 复制内容
+                            </button>
+                            <button id="download-markdown-btn" class="glass">
+                                <i class="fas fa-download"></i> 下载
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(markdownViewerModal);
+
+                // 添加标签页切换功能
+                const previewTab = document.getElementById('markdown-preview-tab');
+                const sourceTab = document.getElementById('markdown-source-tab');
+                const markdownContent = document.getElementById('markdown-content');
+                const markdownSource = document.getElementById('markdown-source');
+
+                previewTab.addEventListener('click', () => {
+                    previewTab.classList.add('active');
+                    sourceTab.classList.remove('active');
+                    markdownContent.style.display = 'block';
+                    markdownSource.style.display = 'none';
+                });
+
+                sourceTab.addEventListener('click', () => {
+                    sourceTab.classList.add('active');
+                    previewTab.classList.remove('active');
+                    markdownContent.style.display = 'none';
+                    markdownSource.style.display = 'block';
+                });
+
+                // 添加关闭事件
+                document.getElementById('close-markdown-viewer').addEventListener('click', () => {
+                    markdownViewerModal.style.display = 'none';
+                    document.body.style.overflow = '';
+                });
+
+                // 点击模态框外部关闭
+                markdownViewerModal.addEventListener('click', (event) => {
+                    if (event.target === markdownViewerModal) {
+                        markdownViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
+
+                // 添加ESC键关闭功能
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && markdownViewerModal.style.display === 'block') {
+                        markdownViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
+            } else {
+                // 如果模态框已存在，更新内容并切换到预览标签
+                const markdownContent = document.getElementById('markdown-content');
+                const markdownSource = document.getElementById('markdown-source');
+                const previewTab = document.getElementById('markdown-preview-tab');
+                const sourceTab = document.getElementById('markdown-source-tab');
+                
+                markdownContent.innerHTML = this.renderMarkdown(markdownText);
+                markdownSource.textContent = markdownText;
+                
+                // 切换到预览标签
+                previewTab.classList.add('active');
+                sourceTab.classList.remove('active');
+                markdownContent.style.display = 'block';
+                markdownSource.style.display = 'none';
+            }
+
+            // 更新复制按钮事件
+            document.getElementById('copy-markdown-btn').onclick = () => {
+                // 根据当前显示的标签页来决定复制的内容
+                const previewTab = document.getElementById('markdown-preview-tab');
+                let contentToCopy;
+                
+                if (previewTab.classList.contains('active')) {
+                    // 如果显示的是预览，复制源码
+                    contentToCopy = markdownText;
+                } else {
+                    // 如果显示的是源码，也复制源码
+                    contentToCopy = markdownText;
+                }
+                
+                navigator.clipboard.writeText(contentToCopy).then(() => {
+                    // 显示复制成功的临时提示
+                    const copyBtn = document.getElementById('copy-markdown-btn');
+                    const originalHTML = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalHTML;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    alert('复制失败');
+                });
+            };
+
+            // 添加下载按钮事件
+            document.getElementById('download-markdown-btn').onclick = () => {
+                const blob = new Blob([markdownText], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            };
+
+            // 显示模态框
+            markdownViewerModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        } catch (error) {
+            console.error('预览Markdown失败:', error);
+            alert('预览Markdown失败: ' + error.message);
+        }
+    }
+
+    // 预览HTML文件
+    async previewHTML(fileId, fileName) {
+        try {
+            // 获取HTML文件内容
+            const response = await fetch(`/api/get-file/${fileId}`, {
+                headers: {
+                    'X-User': this.me
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`加载文件失败: ${response.status}`);
+            }
+
+            const htmlText = await response.text();
+            
+            // 创建HTML预览模态框
+            let htmlViewerModal = document.getElementById('html-viewer-modal');
+            if (!htmlViewerModal) {
+                htmlViewerModal = document.createElement('div');
+                htmlViewerModal.id = 'html-viewer-modal';
+                htmlViewerModal.className = 'modal';
+                htmlViewerModal.innerHTML = `
+                    <div class="html-viewer-content glass">
+                        <div class="modal-header">
+                            <h3>${this.escapeHtml(fileName)}</h3>
+                            <span class="close-btn" id="close-html-viewer">&times;</span>
+                        </div>
+                        <div class="html-tabs">
+                            <button id="html-preview-tab" class="tab-btn active">预览</button>
+                            <button id="html-source-tab" class="tab-btn">源码</button>
+                        </div>
+                        <div class="html-content-wrapper">
+                            <iframe class="html-content" id="html-content" sandbox="allow-same-origin allow-scripts" style="display: block;"></iframe>
+                            <pre class="html-source" id="html-source" style="display: none; width: 100%; height: 100%; overflow: auto; padding: 10px; margin: 0;">${this.escapeHtml(htmlText)}</pre>
+                        </div>
+                        <div class="html-actions">
+                            <button id="download-html-btn" class="glass">
+                                <i class="fas fa-download"></i> 下载
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(htmlViewerModal);
+
+                // 添加标签页切换功能
+                const previewTab = document.getElementById('html-preview-tab');
+                const sourceTab = document.getElementById('html-source-tab');
+                const htmlContentFrame = document.getElementById('html-content');
+                const htmlSource = document.getElementById('html-source');
+
+                previewTab.addEventListener('click', () => {
+                    previewTab.classList.add('active');
+                    sourceTab.classList.remove('active');
+                    htmlContentFrame.style.display = 'block';
+                    htmlSource.style.display = 'none';
+                    
+                    // 重新加载iframe内容
+                    const blob = new Blob([htmlText], { type: 'text/html' });
+                    const htmlUrl = URL.createObjectURL(blob);
+                    htmlContentFrame.src = htmlUrl;
+                });
+
+                sourceTab.addEventListener('click', () => {
+                    previewTab.classList.remove('active');
+                    sourceTab.classList.add('active');
+                    htmlContentFrame.style.display = 'none';
+                    htmlSource.style.display = 'block';
+                });
+
+                // 添加关闭事件
+                document.getElementById('close-html-viewer').addEventListener('click', () => {
+                    htmlViewerModal.style.display = 'none';
+                    document.body.style.overflow = '';
+                    
+                    // 清理iframe URL
+                    htmlContentFrame.src = '';
+                });
+
+                // 点击模态框外部关闭
+                htmlViewerModal.addEventListener('click', (event) => {
+                    if (event.target === htmlViewerModal) {
+                        htmlViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                        
+                        // 清理iframe URL
+                        htmlContentFrame.src = '';
+                    }
+                });
+
+                // 添加ESC键关闭功能
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && htmlViewerModal.style.display === 'block') {
+                        htmlViewerModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                        
+                        // 清理iframe URL
+                        htmlContentFrame.src = '';
+                    }
+                });
+            } else {
+                // 如果模态框已存在，更新内容并切换到预览标签
+                const htmlContentFrame = document.getElementById('html-content');
+                const htmlSource = document.getElementById('html-source');
+                const previewTab = document.getElementById('html-preview-tab');
+                const sourceTab = document.getElementById('html-source-tab');
+                
+                // 更新源码显示
+                htmlSource.textContent = htmlText;
+                
+                // 切换到预览标签
+                previewTab.classList.add('active');
+                sourceTab.classList.remove('active');
+                htmlContentFrame.style.display = 'block';
+                htmlSource.style.display = 'none';
+                
+                // 重新加载iframe内容
+                const blob = new Blob([htmlText], { type: 'text/html' });
+                const htmlUrl = URL.createObjectURL(blob);
+                htmlContentFrame.src = htmlUrl;
+            }
+
+            // 使用iframe显示HTML内容（安全方式）
+            const htmlContentFrame = document.getElementById('html-content');
+            const blob = new Blob([htmlText], { type: 'text/html' });
+            const htmlUrl = URL.createObjectURL(blob);
+            htmlContentFrame.src = htmlUrl;
+            
+            // 添加下载按钮事件
+            document.getElementById('download-html-btn').onclick = () => {
+                const blob = new Blob([htmlText], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            };
+
+            // 显示模态框
+            htmlViewerModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        } catch (error) {
+            console.error('预览HTML失败:', error);
+            alert('预览HTML失败: ' + error.message);
+        }
+    }
+
+    // 简单的Markdown渲染函数
+    renderMarkdown(text) {
+        // 使用marked.js库渲染Markdown，设置安全选项以防止XSS
+        marked.setOptions({
+            gfm: true,
+            breaks: true,
+            sanitize: true,
+            smartLists: true,
+            smartypants: true
+        });
+        
+        // 渲染markdown并返回HTML
+        let html = marked.parse(text);
+        
+        // 为了安全起见，进一步清理可能的危险代码
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // 移除可能的危险元素和属性
+        const dangerousTags = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta', 'base'];
+        const dangerousAttrs = ['onload', 'onclick', 'onerror', 'onmouseover', 'onmouseout', 'onfocus', 'onblur'];
+        
+        // 遍历所有元素，移除危险标签和属性
+        const allElements = tempDiv.querySelectorAll('*');
+        allElements.forEach(el => {
+            // 移除危险属性
+            dangerousAttrs.forEach(attr => {
+                if (el.hasAttribute(attr)) {
+                    el.removeAttribute(attr);
+                }
+            });
+            
+            // 添加rel="noopener noreferrer"到外部链接
+            if (el.tagName === 'A' && el.hasAttribute('href')) {
+                const href = el.getAttribute('href');
+                if (href.startsWith('http') || href.startsWith('//')) {
+                    el.setAttribute('rel', 'noopener noreferrer');
+                    el.setAttribute('target', '_blank');
+                }
+            }
+        });
+        
+        // 移除危险标签
+        dangerousTags.forEach(tag => {
+            const dangerousElems = tempDiv.querySelectorAll(tag);
+            dangerousElems.forEach(elem => {
+                elem.remove();
+            });
+        });
+        
+        return tempDiv.innerHTML;
+    }
+
     // 预览代码文件
     async previewCode(fileId, fileName, fileType) {
         try {
@@ -1377,22 +1744,22 @@ class ChatApp {
                 throw new Error(`加载文件失败: ${response.status}`);
             }
 
-            const text = await response.text();
+            const codeText = await response.text();
             
             // 创建代码预览模态框
             let codeViewerModal = document.getElementById('code-viewer-modal');
             if (!codeViewerModal) {
                 codeViewerModal = document.createElement('div');
                 codeViewerModal.id = 'code-viewer-modal';
-                codeViewerModal.className = 'modal';
+                codeViewerModal.className = 'modal code-viewer-modal';
                 codeViewerModal.innerHTML = `
-                    <div class="code-viewer-content glass">
+                    <div class="code-viewer-content">
                         <div class="modal-header">
                             <h3>${this.escapeHtml(fileName)}</h3>
                             <span class="close-btn" id="close-code-viewer">&times;</span>
                         </div>
                         <div class="code-content-wrapper">
-                            <pre><code class="code-content" id="code-content"></code></pre>
+                            <pre class="code-content" id="code-content">${this.escapeHtml(codeText)}</pre>
                         </div>
                         <div class="code-actions">
                             <button id="copy-code-btn" class="glass">
@@ -1427,16 +1794,57 @@ class ChatApp {
                         document.body.style.overflow = '';
                     }
                 });
+            } else {
+                // 如果模态框已存在，更新内容
+                const codeContentElement = document.getElementById('code-content');
+                codeContentElement.textContent = codeText;
             }
 
-            // 设置代码内容
+            // 使用Prism.js进行语法高亮
             const codeContentElement = document.getElementById('code-content');
-            // 简单的语法高亮实现
-            codeContentElement.innerHTML = this.highlightSyntax(text, fileType);
-            
+            if (typeof Prism !== 'undefined') {
+                // 映射文件扩展名到Prism语言标识符
+                const langMap = {
+                    'js': 'javascript',
+                    'ts': 'typescript',
+                    'html': 'html',
+                    'htm': 'html',
+                    'css': 'css',
+                    'py': 'python',
+                    'java': 'java',
+                    'c': 'c',
+                    'cpp': 'cpp',
+                    'h': 'c',
+                    'hpp': 'cpp',
+                    'php': 'php',
+                    'rb': 'ruby',
+                    'go': 'go',
+                    'rs': 'rust',
+                    'swift': 'swift',
+                    'kt': 'kotlin',
+                    'scala': 'scala',
+                    'sql': 'sql',
+                    'json': 'json',
+                    'xml': 'xml',
+                    'yaml': 'yaml',
+                    'yml': 'yaml',
+                    'md': 'markdown',
+                    'csv': 'csv',
+                    'log': 'log'
+                };
+                
+                const language = langMap[fileType.toLowerCase()] || 'none';
+                
+                // 先移除之前的类
+                codeContentElement.className = 'code-content language-' + language;
+                
+                // 使用Prism进行语法高亮
+                Prism.highlightElement(codeContentElement);
+            }
+
             // 添加复制按钮事件
             document.getElementById('copy-code-btn').onclick = () => {
-                navigator.clipboard.writeText(text).then(() => {
+                navigator.clipboard.writeText(codeText).then(() => {
                     // 显示复制成功的临时提示
                     const copyBtn = document.getElementById('copy-code-btn');
                     const originalHTML = copyBtn.innerHTML;
@@ -1452,7 +1860,7 @@ class ChatApp {
 
             // 添加下载按钮事件
             document.getElementById('download-code-btn').onclick = () => {
-                const blob = new Blob([text], { type: 'text/plain' });
+                const blob = new Blob([codeText], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -1471,79 +1879,6 @@ class ChatApp {
             console.error('预览代码失败:', error);
             alert('预览代码失败: ' + error.message);
         }
-    }
-
-    // 简单的语法高亮函数
-    highlightSyntax(code, fileType) {
-        // 先对代码进行HTML转义以确保安全
-        let highlightedCode = this.escapeHtml(code);
-        
-        // 定义各种语言的关键字
-        const keywords = {
-            js: ['var', 'let', 'const', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'typeof', 'instanceof', 'in', 'of', 'class', 'extends', 'import', 'export', 'default', 'from', 'as', 'async', 'await', 'yield', 'static', 'get', 'set', 'constructor'],
-            ts: ['var', 'let', 'const', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'typeof', 'instanceof', 'in', 'of', 'class', 'extends', 'import', 'export', 'default', 'from', 'as', 'async', 'await', 'yield', 'static', 'get', 'set', 'constructor', 'type', 'interface', 'enum', 'public', 'private', 'protected', 'readonly', 'any', 'string', 'number', 'boolean', 'null', 'undefined', 'void', 'never', 'true', 'false'],
-            java: ['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'],
-            py: ['and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'exec', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'not', 'or', 'pass', 'print', 'raise', 'return', 'try', 'while', 'with', 'yield', 'True', 'False', 'None'],
-            cpp: ['auto', 'break', 'case', 'char', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extern', 'float', 'for', 'goto', 'if', 'int', 'long', 'register', 'return', 'short', 'signed', 'sizeof', 'static', 'struct', 'switch', 'typedef', 'union', 'unsigned', 'void', 'volatile', 'while', 'asm', 'bool', 'catch', 'class', 'const_cast', 'delete', 'dynamic_cast', 'explicit', 'export', 'false', 'friend', 'inline', 'mutable', 'namespace', 'new', 'operator', 'private', 'protected', 'public', 'reinterpret_cast', 'static_cast', 'template', 'this', 'throw', 'true', 'try', 'typeid', 'typename', 'using', 'virtual', 'wchar_t'],
-            html: ['html', 'head', 'title', 'body', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'div', 'span', 'a', 'img', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'form', 'input', 'button', 'script', 'style', 'link', 'meta', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'main', 'figure', 'figcaption', 'small', 'strong', 'em', 'i', 'b', 'u', 'pre', 'code', 'blockquote', 'cite', 'q', 'abbr', 'address', 'time', 'progress', 'meter', 'output', 'datalist', 'optgroup', 'option', 'textarea', 'select', 'label', 'fieldset', 'legend', 'details', 'summary', 'dialog', 'menu', 'menuitem', 'applet', 'embed', 'iframe', 'object', 'param', 'source', 'track', 'video', 'audio', 'canvas', 'map', 'area', 'base', 'col', 'colgroup', 'tbody', 'thead', 'tfoot'],
-            css: ['align-content', 'align-items', 'align-self', 'all', 'animation', 'animation-delay', 'animation-direction', 'animation-duration', 'animation-fill-mode', 'animation-iteration-count', 'animation-name', 'animation-play-state', 'animation-timing-function', 'backface-visibility', 'background', 'background-attachment', 'background-blend-mode', 'background-clip', 'background-color', 'background-image', 'background-origin', 'background-position', 'background-repeat', 'background-size', 'border', 'border-bottom', 'border-bottom-color', 'border-bottom-left-radius', 'border-bottom-right-radius', 'border-bottom-style', 'border-bottom-width', 'border-collapse', 'border-color', 'border-image', 'border-image-outset', 'border-image-repeat', 'border-image-slice', 'border-image-source', 'border-image-width', 'border-left', 'border-left-color', 'border-left-style', 'border-left-width', 'border-radius', 'border-right', 'border-right-color', 'border-right-style', 'border-right-width', 'border-spacing', 'border-style', 'border-top', 'border-top-color', 'border-top-left-radius', 'border-top-right-radius', 'border-top-style', 'border-top-width', 'border-width', 'bottom', 'box-decoration-break', 'box-shadow', 'box-sizing', 'break-after', 'break-before', 'break-inside', 'caption-side', 'clear', 'clip', 'clip-path', 'color', 'column-count', 'column-fill', 'column-gap', 'column-rule', 'column-rule-color', 'column-rule-style', 'column-rule-width', 'column-span', 'column-width', 'columns', 'content', 'counter-increment', 'counter-reset', 'cursor', 'direction', 'display', 'empty-cells', 'filter', 'flex', 'flex-basis', 'flex-direction', 'flex-flow', 'flex-grow', 'flex-shrink', 'flex-wrap', 'float', 'font', 'font-family', 'font-feature-settings', 'font-kerning', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'grid', 'grid-area', 'grid-auto-columns', 'grid-auto-flow', 'grid-auto-rows', 'grid-column', 'grid-column-end', 'grid-column-gap', 'grid-column-start', 'grid-gap', 'grid-row', 'grid-row-end', 'grid-row-gap', 'grid-row-start', 'grid-template', 'grid-template-areas', 'grid-template-columns', 'grid-template-rows', 'hanging-punctuation', 'height', 'hyphens', 'icon', 'image-orientation', 'image-rendering', 'image-resolution', 'ime-mode', 'justify-content', 'left', 'letter-spacing', 'line-break', 'line-height', 'list-style', 'list-style-image', 'list-style-position', 'list-style-type', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'max-height', 'max-width', 'min-height', 'min-width', 'nav-down', 'nav-index', 'nav-left', 'nav-right', 'nav-up', 'object-fit', 'object-position', 'opacity', 'order', 'orphans', 'outline', 'outline-color', 'outline-offset', 'outline-style', 'outline-width', 'overflow', 'overflow-wrap', 'overflow-x', 'overflow-y', 'padding', 'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'page-break-after', 'page-break-before', 'page-break-inside', 'perspective', 'perspective-origin', 'pointer-events', 'position', 'quotes', 'resize', 'right', 'tab-size', 'table-layout', 'text-align', 'text-align-last', 'text-decoration', 'text-decoration-color', 'text-decoration-line', 'text-decoration-style', 'text-indent', 'text-justify', 'text-overflow', 'text-shadow', 'text-transform', 'top', 'transform', 'transform-origin', 'transform-style', 'transition', 'transition-delay', 'transition-duration', 'transition-property', 'transition-timing-function', 'unicode-bidi', 'vertical-align', 'visibility', 'white-space', 'widows', 'width', 'word-break', 'word-spacing', 'word-wrap', 'z-index'],
-            php: ['and', 'or', 'xor', 'as', 'break', 'case', 'cfunction', 'class', 'const', 'continue', 'declare', 'default', 'do', 'else', 'elseif', 'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'extends', 'for', 'foreach', 'function', 'include', 'include_once', 'global', 'if', 'new', 'old_function', 'return', 'static', 'switch', 'use', 'require', 'require_once', 'var', 'while', 'abstract', 'catch', 'final', 'implements', 'interface', 'instanceof', 'namespace', 'private', 'protected', 'public', 'throw', 'try', 'final'],
-            sql: ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'TABLE', 'DATABASE', 'INDEX', 'VIEW', 'TRIGGER', 'PROCEDURE', 'FUNCTION', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'UNIQUE', 'NOT', 'NULL', 'DEFAULT', 'CHECK', 'CONSTRAINT', 'UNION', 'ALL', 'EXCEPT', 'INTERSECT', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'OUTER', 'ON', 'GROUP', 'BY', 'HAVING', 'ORDER', 'LIMIT', 'OFFSET', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'IS', 'INTO', 'VALUES', 'COMMIT', 'ROLLBACK', 'TRANSACTION', 'BEGIN', 'ADD', 'COLUMN', 'TO', 'BY', 'ASC', 'DESC', 'TRUE', 'FALSE']
-        };
-
-        // 为字符串添加高亮（先处理，避免干扰关键字匹配）
-        highlightedCode = this.highlightStrings(highlightedCode);
-        
-        // 为注释添加高亮（在字符串之后，但在关键字之前）
-        highlightedCode = this.highlightComments(highlightedCode, fileType);
-        
-        // 为关键字添加高亮
-        const languageKeywords = keywords[fileType] || [];
-        highlightedCode = this.highlightKeywords(highlightedCode, languageKeywords);
-        
-        return highlightedCode;
-    }
-
-    // 为注释添加高亮
-    highlightComments(code, fileType) {
-        // 多行注释 - 处理 /* */ 和 /** */ 样式
-        code = code.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
-        
-        // 单行注释 - 根据语言类型
-        if (['js', 'ts', 'java', 'cpp', 'css', 'php'].includes(fileType)) {
-            code = code.replace(/(\/\/.*)/g, '<span class="comment">$1</span>');
-        } else if (['py', 'sql', 'rb'].includes(fileType)) {
-            code = code.replace(/(#.*)/g, '<span class="comment">$1</span>');
-        } else if (['html'].includes(fileType)) {
-            code = code.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="comment">$1</span>');
-        }
-        
-        return code;
-    }
-
-    // 为关键字添加高亮
-    highlightKeywords(code, keywords) {
-        if (!keywords || keywords.length === 0) return code;
-        
-        // 创建匹配关键字的正则表达式，使用非重叠匹配
-        for (const keyword of keywords) {
-            // 使用单词边界确保完整匹配关键字，防止部分匹配
-            const regex = new RegExp('\\b' + this.escapeRegExp(keyword) + '\\b', 'g');
-            code = code.replace(regex, '<span class="keyword">$&</span>');
-        }
-        
-        return code;
-    }
-
-    // 为字符串添加高亮
-    highlightStrings(code) {
-        // 匹配单引号和双引号字符串（处理转义字符）
-        return code.replace(/("[^"\\]*(\\.[^"\\]*)*"|'[^'\\]*(\\.[^'\\]*)*')/g, '<span class="string">$1</span>');
-    }
-
-    // 转义正则表达式特殊字符
-    escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     addMessageToUI(message, isOwnMessage = false) {
